@@ -34,6 +34,13 @@ Application::~Application() {
 
 void Application::buildDefaultScene() {
     m_scene->addPrimitive(geometry::PrimitiveType::Tesseract);
+
+    auto& sun = m_scene->addEntity("Sun");
+    sun.light = scene::DirectionalLight{};
+    // Tilt the canonical (0, -1, 0, 0) direction toward the front-right for a typical
+    // sun angle. The light direction is derived from this rotation at render time.
+    sun.transform.rotation.xy = 0.4f;
+    sun.transform.rotation.yz = 0.5f;
 }
 
 int Application::run() {

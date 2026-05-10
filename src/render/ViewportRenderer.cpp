@@ -17,6 +17,42 @@ namespace hopf::render {
 
 namespace {
 
+// 4D -> 3D projection consistent with how meshes are rendered. In Projection mode
+// the result is (x, y, z) (optionally w-perspective-scaled). In Slice mode the result
+// is the three components other than the slice axis, in axis order.
+std::array<float, 3> project4to3(const math::Vec4& v, const Camera4D& camera) {
+    if (camera.mode == ViewMode::Projection) {
+        if (camera.projectionStyle == ProjectionStyle::Perspective) {
+            const float wp = v.w + camera.wOffset;
+            const float k  = wp != 0.f ? camera.focal4 / wp : 1.f;
+            return { v.x * k, v.y * k, v.z * k };
+        }
+        return { v.x, v.y, v.z };
+    }
+    const int axis = static_cast<int>(camera.sliceAxis);
+    std::array<float, 3> out{};
+    int oi = 0;
+    for (int i = 0; i < 4; ++i) {
+        if (i != axis) out[oi++] = v[i];
+    }
+    return out;
+}
+
+// Like project4to3 but for a direction vector: no perspective scaling. Used to bring
+// the directional light into the same 3D space as the rendered geometry's normals.
+std::array<float, 3> projectDir4to3(const math::Vec4& d, const Camera4D& camera) {
+    if (camera.mode == ViewMode::Projection) {
+        return { d.x, d.y, d.z };
+    }
+    const int axis = static_cast<int>(camera.sliceAxis);
+    std::array<float, 3> out{};
+    int oi = 0;
+    for (int i = 0; i < 4; ++i) {
+        if (i != axis) out[oi++] = d[i];
+    }
+    return out;
+}
+
 void drawWorldAxes(uint32_t vao, uint32_t vbo, uint32_t ebo, Shader& s,
                    const math::Mat5& viewFromWorld, const Camera4D& camera)
 {
@@ -34,51 +70,118 @@ void drawWorldAxes(uint32_t vao, uint32_t vbo, uint32_t ebo, Shader& s,
         {1.0f, 0.85f, 0.20f},
     };
 
-    // The W axis collapses to a point in Slice mode (it's normal to the hyperplane),
-    // so we skip it there.
-    const int axisCount = (camera.mode == ViewMode::Projection) ? 4 : 3;
-
-    auto project4to3 = [&](const math::Vec4& v) -> std::array<float, 3> {
-        if (camera.mode == ViewMode::Projection && camera.perspective4) {
-            const float wp = v.w + camera.wOffset;
-            const float k = wp != 0.f ? camera.focal4 / wp : 1.f;
-            return {v.x * k, v.y * k, v.z * k};
-        }
-        return {v.x, v.y, v.z};
-    };
+    // In Slice mode the axis perpendicular to the hyperplane collapses to a point;
+    // skip drawing it. In Projection mode all 4 axes are drawn.
+    const int hideAxis = (camera.mode == ViewMode::Slice)
+                       ? static_cast<int>(camera.sliceAxis)
+                       : -1;
 
     const math::Vec4 originView = viewFromWorld.transformPoint({0, 0, 0, 0});
-    const auto       originProj = project4to3(originView);
+    const auto       originProj = project4to3(originView, camera);
 
     struct V { float x, y, z, w; };
     V        verts[8];
     uint32_t idx[8];
-    for (int i = 0; i < axisCount; ++i) {
+    int slotCount = 0;
+    int slot[4]   = { -1, -1, -1, -1 };
+    for (int i = 0; i < 4; ++i) {
+        if (i == hideAxis) continue;
         const math::Vec4 endView = viewFromWorld.transformPoint(axisLocal[i]);
-        const auto       endProj = project4to3(endView);
-        verts[i * 2 + 0] = {originProj[0], originProj[1], originProj[2], originView.w};
-        verts[i * 2 + 1] = {endProj[0],    endProj[1],    endProj[2],    endView.w};
-        idx[i * 2 + 0] = static_cast<uint32_t>(i * 2 + 0);
-        idx[i * 2 + 1] = static_cast<uint32_t>(i * 2 + 1);
+        const auto       endProj = project4to3(endView, camera);
+        verts[slotCount * 2 + 0] = {originProj[0], originProj[1], originProj[2], originView.w};
+        verts[slotCount * 2 + 1] = {endProj[0],    endProj[1],    endProj[2],    endView.w};
+        idx[slotCount * 2 + 0] = static_cast<uint32_t>(slotCount * 2 + 0);
+        idx[slotCount * 2 + 1] = static_cast<uint32_t>(slotCount * 2 + 1);
+        slot[i] = slotCount;
+        ++slotCount;
     }
+
+    if (slotCount == 0) return;
 
     glBindVertexArray(vao);
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
     glBufferData(GL_ARRAY_BUFFER,
-                 static_cast<GLsizeiptr>(axisCount * 2 * sizeof(V)),
+                 static_cast<GLsizeiptr>(slotCount * 2 * sizeof(V)),
                  verts, GL_STREAM_DRAW);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER,
-                 static_cast<GLsizeiptr>(axisCount * 2 * sizeof(uint32_t)),
+                 static_cast<GLsizeiptr>(slotCount * 2 * sizeof(uint32_t)),
                  idx, GL_STREAM_DRAW);
 
     s.bind();
     s.setInt("uDepthShade", 0);
-    for (int i = 0; i < axisCount; ++i) {
+    s.setFloat("uAlpha", 1.f);
+    for (int i = 0; i < 4; ++i) {
+        if (slot[i] < 0) continue;
         s.setVec3("uColor", colors[i][0], colors[i][1], colors[i][2]);
         glDrawElements(GL_LINES, 2, GL_UNSIGNED_INT,
-                       (void*)(static_cast<intptr_t>(i * 2 * sizeof(uint32_t))));
+                       (void*)(static_cast<intptr_t>(slot[i] * 2 * sizeof(uint32_t))));
     }
+}
+
+void drawGrids(uint32_t vao, uint32_t vbo, uint32_t ebo, Shader& s,
+               const math::Mat5& viewFromWorld, const Camera4D& camera)
+{
+    const auto& g = camera.grid;
+    const bool any = g.showXY || g.showXZ || g.showYZ
+                  || g.showXW || g.showYW || g.showZW;
+    if (!any || g.opacity <= 0.f) return;
+
+    constexpr int   halfN = 5;
+    constexpr float step  = 1.f;
+    const float ext = float(halfN) * step;
+
+    struct V { float x, y, z, w; };
+    std::vector<V>        verts;
+    std::vector<uint32_t> idx;
+
+    auto addPlaneGrid = [&](int axis1, int axis2) {
+        for (int i = -halfN; i <= halfN; ++i) {
+            const float a = float(i) * step;
+            // Two perpendicular line families through (a1=a, axis2 spans ±ext)
+            // and (axis2=a, axis1 spans ±ext).
+            math::Vec4 p[4]{};
+            p[0][axis1] =  a;     p[0][axis2] = -ext;
+            p[1][axis1] =  a;     p[1][axis2] =  ext;
+            p[2][axis2] =  a;     p[2][axis1] = -ext;
+            p[3][axis2] =  a;     p[3][axis1] =  ext;
+            for (int k = 0; k < 4; ++k) {
+                const auto pp = project4to3(viewFromWorld.transformPoint(p[k]), camera);
+                verts.push_back({pp[0], pp[1], pp[2], 0.f});
+            }
+        }
+    };
+
+    if (g.showXY) addPlaneGrid(0, 1);
+    if (g.showXZ) addPlaneGrid(0, 2);
+    if (g.showYZ) addPlaneGrid(1, 2);
+    if (g.showXW) addPlaneGrid(0, 3);
+    if (g.showYW) addPlaneGrid(1, 3);
+    if (g.showZW) addPlaneGrid(2, 3);
+
+    idx.reserve(verts.size());
+    for (uint32_t i = 0; i < verts.size(); ++i) idx.push_back(i);
+
+    glBindVertexArray(vao);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)(verts.size() * sizeof(V)),
+                 verts.data(), GL_STREAM_DRAW);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, (GLsizeiptr)(idx.size() * sizeof(uint32_t)),
+                 idx.data(), GL_STREAM_DRAW);
+
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glDepthMask(GL_FALSE);
+
+    s.bind();
+    s.setInt("uDepthShade", 0);
+    s.setVec3("uColor", 0.45f, 0.45f, 0.50f);
+    s.setFloat("uAlpha", g.opacity);
+    glDrawElements(GL_LINES, (GLsizei)idx.size(), GL_UNSIGNED_INT, nullptr);
+
+    glDepthMask(GL_TRUE);
+    glDisable(GL_BLEND);
 }
 
 } // namespace
@@ -92,7 +195,6 @@ ViewportRenderer::~ViewportRenderer() {
     if (m_lineVbo) glDeleteBuffers(1, &m_lineVbo);
     if (m_lineVao) glDeleteVertexArrays(1, &m_lineVao);
 
-    if (m_triEbo) glDeleteBuffers(1, &m_triEbo);
     if (m_triVbo) glDeleteBuffers(1, &m_triVbo);
     if (m_triVao) glDeleteVertexArrays(1, &m_triVao);
 }
@@ -148,13 +250,14 @@ void ViewportRenderer::ensureGpuResources() {
     if (!m_triVao) {
         glGenVertexArrays(1, &m_triVao);
         glGenBuffers(1, &m_triVbo);
-        glGenBuffers(1, &m_triEbo);
 
         glBindVertexArray(m_triVao);
         glBindBuffer(GL_ARRAY_BUFFER, m_triVbo);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_triEbo);
+        // Layout: vec3 pos at offset 0, vec3 flat normal at offset 12.
         glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)(0));
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(0));
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
     }
 
     if (!m_shadersReady) {
@@ -190,9 +293,18 @@ void ViewportRenderer::render(const scene::Scene& scene, const Camera4D& camera)
     // remains continuous through 360deg.
     const float upY = std::cos(pitch) >= 0.f ? 1.f : -1.f;
 
-    const float aspect = float(m_width) / float(m_height);
-    const math::Mat4 P = math::perspective(camera.fovYDeg * 3.14159265f / 180.f,
-                                           aspect, camera.zNear, camera.zFar);
+    const float aspect  = float(m_width) / float(m_height);
+    const float fovYRad = camera.fovYDeg * 3.14159265f / 180.f;
+    math::Mat4 P;
+    if (camera.projectionStyle == ProjectionStyle::Perspective) {
+        P = math::perspective(fovYRad, aspect, camera.zNear, camera.zFar);
+    } else {
+        // Match the perspective view's apparent size at the pivot: the visible vertical
+        // half-extent at distance `dist` is `dist * tan(fovY/2)`.
+        const float halfH = std::max(0.05f, dist) * std::tan(fovYRad * 0.5f);
+        const float halfW = halfH * aspect;
+        P = math::ortho(-halfW, halfW, -halfH, halfH, camera.zNear, camera.zFar);
+    }
     const math::Mat4 V = math::lookAt(ex, ey, ez,
                                       camera.pivotX, camera.pivotY, camera.pivotZ,
                                       0.f, upY, 0.f);
@@ -215,35 +327,31 @@ void ViewportRenderer::render(const scene::Scene& scene, const Camera4D& camera)
 
     m_lineShader.bind();
     m_lineShader.setMat4("uViewProj", VP.data());
+    drawGrids(m_lineVao, m_lineVbo, m_lineEbo, m_lineShader, viewFromWorld, camera);
     drawWorldAxes(m_lineVao, m_lineVbo, m_lineEbo, m_lineShader, viewFromWorld, camera);
 
     {
-        // Cache the screen-space tip of each gizmo axis so the editor can overlay letters.
         const float L = 1.f;
         const math::Vec4 axisLocal[4] = {
             {L, 0, 0, 0}, {0, L, 0, 0}, {0, 0, L, 0}, {0, 0, 0, L},
         };
-        const int axisCount = (camera.mode == ViewMode::Projection) ? 4 : 3;
+        const int hideAxis = (camera.mode == ViewMode::Slice)
+                           ? static_cast<int>(camera.sliceAxis)
+                           : -1;
         for (int i = 0; i < 4; ++i) {
             m_axisLabels[i].visible = false;
-            if (i >= axisCount) continue;
+            if (i == hideAxis) continue;
 
             const math::Vec4 vw = viewFromWorld.transformPoint(axisLocal[i]);
-            float p3x = vw.x, p3y = vw.y, p3z = vw.z;
-            if (camera.mode == ViewMode::Projection && camera.perspective4) {
-                const float wp = vw.w + camera.wOffset;
-                const float k  = wp != 0.f ? camera.focal4 / wp : 1.f;
-                p3x *= k; p3y *= k; p3z *= k;
-            }
-            const float clipX = VP[0]*p3x + VP[4]*p3y + VP[8] *p3z + VP[12];
-            const float clipY = VP[1]*p3x + VP[5]*p3y + VP[9] *p3z + VP[13];
-            const float clipW = VP[3]*p3x + VP[7]*p3y + VP[11]*p3z + VP[15];
+            const auto p3 = project4to3(vw, camera);
+            const float clipX = VP[0]*p3[0] + VP[4]*p3[1] + VP[8] *p3[2] + VP[12];
+            const float clipY = VP[1]*p3[0] + VP[5]*p3[1] + VP[9] *p3[2] + VP[13];
+            const float clipW = VP[3]*p3[0] + VP[7]*p3[1] + VP[11]*p3[2] + VP[15];
             if (clipW <= 1e-4f) continue;
 
             const float ndcX = clipX / clipW;
             const float ndcY = clipY / clipW;
             m_axisLabels[i].u = (ndcX + 1.f) * 0.5f * float(m_width);
-            // Flip Y: GL's NDC has +Y up, ImGui's image coords have +Y down.
             m_axisLabels[i].v = (1.f - (ndcY + 1.f) * 0.5f) * float(m_height);
             m_axisLabels[i].visible = true;
         }
@@ -255,23 +363,41 @@ void ViewportRenderer::render(const scene::Scene& scene, const Camera4D& camera)
     glDisable(GL_BLEND);
     glDepthMask(GL_TRUE);
 
+    // Pick the first visible directional light. The light's direction comes from the
+    // owning entity's transform.rotation applied to a canonical "down" vector. After the
+    // view transform and 4D->3D projection, it lives in the same space as triangle normals.
+    const math::Vec4 lightCanonical{0.f, -1.f, 0.f, 0.f};
+    math::Vec4 lightDir4 = lightCanonical;
+    float      lightIntensity = 1.f;
+    for (const auto& e : scene.entities()) {
+        if (e.visible && e.light.has_value()) {
+            lightDir4 = e.transform.rotation.toMatrix().transformDirection(lightCanonical);
+            lightIntensity = e.light->intensity;
+            break;
+        }
+    }
+    const math::Vec4 lightDirView = viewFromWorld.transformDirection(lightDir4);
+    auto ld3 = projectDir4to3(lightDirView, camera);
+    // Shader expects direction TO the light source (n . l).
+    float lx = -ld3[0], ly = -ld3[1], lz = -ld3[2];
+    const float lLen = std::sqrt(lx*lx + ly*ly + lz*lz);
+    if (lLen > 1e-5f) { lx /= lLen; ly /= lLen; lz /= lLen; }
+
     for (const auto& e : scene.entities()) {
         if (!e.visible || !e.mesh) continue;
         const math::Mat5 viewFromLocal = viewFromWorld * e.transform.toMatrix();
 
         if (camera.mode == ViewMode::Slice) {
-            const SliceMesh sm = sliceMesh(*e.mesh, viewFromLocal, camera.sliceW);
-            if (sm.indices.empty()) continue;
+            const SliceMesh sm = sliceMesh(*e.mesh, viewFromLocal,
+                                           static_cast<int>(camera.sliceAxis),
+                                           camera.sliceVal);
+            if (sm.triVertices.empty()) continue;
 
             glBindVertexArray(m_triVao);
             glBindBuffer(GL_ARRAY_BUFFER, m_triVbo);
             glBufferData(GL_ARRAY_BUFFER,
-                         (GLsizeiptr)(sm.positions.size() * sizeof(SliceMesh::Vertex3)),
-                         sm.positions.data(), GL_STREAM_DRAW);
-            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_triEbo);
-            glBufferData(GL_ELEMENT_ARRAY_BUFFER,
-                         (GLsizeiptr)(sm.indices.size() * sizeof(uint32_t)),
-                         sm.indices.data(), GL_STREAM_DRAW);
+                         (GLsizeiptr)(sm.triVertices.size() * sizeof(SliceMesh::TriVertex)),
+                         sm.triVertices.data(), GL_STREAM_DRAW);
 
             glPolygonMode(GL_FRONT_AND_BACK, isSolid ? GL_FILL : GL_LINE);
 
@@ -280,40 +406,37 @@ void ViewportRenderer::render(const scene::Scene& scene, const Camera4D& camera)
             m_triShader.setVec3("uColor", 0.85f, 0.78f, 0.55f);
             m_triShader.setFloat("uAlpha", 1.f);
             m_triShader.setInt("uLit", isLit ? 1 : 0);
-            glDrawElements(GL_TRIANGLES, (GLsizei)sm.indices.size(), GL_UNSIGNED_INT, nullptr);
+            m_triShader.setVec3("uLightDir", lx, ly, lz);
+            m_triShader.setFloat("uLightIntensity", lightIntensity);
+            glDrawArrays(GL_TRIANGLES, 0, (GLsizei)sm.triVertices.size());
             glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
         } else {
             const ProjectedMesh pm = projectMesh(*e.mesh, viewFromLocal,
-                                                 camera.perspective4,
+                                                 camera.projectionStyle == ProjectionStyle::Perspective,
                                                  camera.focal4,
                                                  camera.wOffset);
 
-            if (isSolid && !pm.triangleIndices.empty()) {
-                // The line VBO uses (xyz, wDepth) stride 16; the tri shader only reads
-                // location 0 (vec3), so the wDepth lane is ignored.
-                glBindVertexArray(m_lineVao);
-                glBindBuffer(GL_ARRAY_BUFFER, m_lineVbo);
+            if (isSolid && !pm.triVertices.empty()) {
+                glBindVertexArray(m_triVao);
+                glBindBuffer(GL_ARRAY_BUFFER, m_triVbo);
                 glBufferData(GL_ARRAY_BUFFER,
-                             (GLsizeiptr)(pm.positions.size() * sizeof(ProjectedMesh::Vertex3)),
-                             pm.positions.data(), GL_STREAM_DRAW);
-                glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_lineEbo);
-                glBufferData(GL_ELEMENT_ARRAY_BUFFER,
-                             (GLsizeiptr)(pm.triangleIndices.size() * sizeof(uint32_t)),
-                             pm.triangleIndices.data(), GL_STREAM_DRAW);
+                             (GLsizeiptr)(pm.triVertices.size() * sizeof(ProjectedMesh::TriVertex)),
+                             pm.triVertices.data(), GL_STREAM_DRAW);
 
                 m_triShader.bind();
                 m_triShader.setMat4("uViewProj", VP.data());
                 m_triShader.setVec3("uColor", 0.78f, 0.84f, 0.95f);
                 m_triShader.setFloat("uAlpha", 1.f);
                 m_triShader.setInt("uLit", isLit ? 1 : 0);
-                glDrawElements(GL_TRIANGLES, (GLsizei)pm.triangleIndices.size(),
-                               GL_UNSIGNED_INT, nullptr);
+                m_triShader.setVec3("uLightDir", lx, ly, lz);
+                m_triShader.setFloat("uLightIntensity", lightIntensity);
+                glDrawArrays(GL_TRIANGLES, 0, (GLsizei)pm.triVertices.size());
             } else if (!isSolid && !pm.lineIndices.empty()) {
                 glBindVertexArray(m_lineVao);
                 glBindBuffer(GL_ARRAY_BUFFER, m_lineVbo);
                 glBufferData(GL_ARRAY_BUFFER,
-                             (GLsizeiptr)(pm.positions.size() * sizeof(ProjectedMesh::Vertex3)),
-                             pm.positions.data(), GL_STREAM_DRAW);
+                             (GLsizeiptr)(pm.linePositions.size() * sizeof(ProjectedMesh::LineVertex)),
+                             pm.linePositions.data(), GL_STREAM_DRAW);
                 glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_lineEbo);
                 glBufferData(GL_ELEMENT_ARRAY_BUFFER,
                              (GLsizeiptr)(pm.lineIndices.size() * sizeof(uint32_t)),
@@ -324,6 +447,7 @@ void ViewportRenderer::render(const scene::Scene& scene, const Camera4D& camera)
                 m_lineShader.setVec3("uColor", 1.f, 1.f, 1.f);
                 m_lineShader.setInt("uDepthShade",
                                     camera.style == DisplayStyle::DepthWireframe ? 1 : 0);
+                m_lineShader.setFloat("uAlpha", 1.f);
                 glDrawElements(GL_LINES, (GLsizei)pm.lineIndices.size(),
                                GL_UNSIGNED_INT, nullptr);
             }
@@ -334,6 +458,111 @@ void ViewportRenderer::render(const scene::Scene& scene, const Camera4D& camera)
     glDisable(GL_BLEND);
     glBindVertexArray(0);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+scene::EntityId ViewportRenderer::pickEntityAt(const scene::Scene& scene,
+                                               const Camera4D& camera,
+                                               float u, float v) const
+{
+    if (m_width <= 0 || m_height <= 0) return 0;
+
+    const float yaw   = camera.yaw;
+    const float pitch = camera.pitch;
+    const float dist  = std::max(0.1f, camera.distance);
+    const float dirX = std::cos(pitch) * std::sin(yaw);
+    const float dirY = std::sin(pitch);
+    const float dirZ = std::cos(pitch) * std::cos(yaw);
+    const float ex = camera.pivotX + dist * dirX;
+    const float ey = camera.pivotY + dist * dirY;
+    const float ez = camera.pivotZ + dist * dirZ;
+    const float upY = std::cos(pitch) >= 0.f ? 1.f : -1.f;
+
+    const float aspect  = float(m_width) / float(m_height);
+    const float fovYRad = camera.fovYDeg * 3.14159265f / 180.f;
+    math::Mat4 P;
+    if (camera.projectionStyle == ProjectionStyle::Perspective) {
+        P = math::perspective(fovYRad, aspect, camera.zNear, camera.zFar);
+    } else {
+        const float halfH = std::max(0.05f, dist) * std::tan(fovYRad * 0.5f);
+        const float halfW = halfH * aspect;
+        P = math::ortho(-halfW, halfW, -halfH, halfH, camera.zNear, camera.zFar);
+    }
+    const math::Mat4 V = math::lookAt(ex, ey, ez,
+                                      camera.pivotX, camera.pivotY, camera.pivotZ,
+                                      0.f, upY, 0.f);
+    const math::Mat4 VP = math::mat4Mul(P, V);
+    const math::Mat5 viewFromWorld = camera.rotation4.toInverseMatrix();
+
+    const float ndcX = 2.f * (u / float(m_width)) - 1.f;
+    const float ndcY = 1.f - 2.f * (v / float(m_height));
+
+    auto applyVP = [&](float x, float y, float z, float& cx, float& cy, float& cw) {
+        cx = VP[0]*x + VP[4]*y + VP[8] *z + VP[12];
+        cy = VP[1]*x + VP[5]*y + VP[9] *z + VP[13];
+        cw = VP[3]*x + VP[7]*y + VP[11]*z + VP[15];
+    };
+
+    auto sign = [](float ax, float ay, float bx, float by, float cx, float cy) {
+        return (ax - cx) * (by - cy) - (bx - cx) * (ay - cy);
+    };
+
+    scene::EntityId bestId = 0;
+    float           bestZ  = 1e30f;
+
+    for (const auto& e : scene.entities()) {
+        if (!e.visible || !e.mesh) continue;
+        const math::Mat5 viewFromLocal = viewFromWorld * e.transform.toMatrix();
+
+        // Gather projected/sliced triangle vertices.
+        std::vector<float> verts; // flat (x,y,z) per vertex, 3 verts per triangle
+        if (camera.mode == ViewMode::Slice) {
+            const SliceMesh sm = sliceMesh(*e.mesh, viewFromLocal,
+                                           static_cast<int>(camera.sliceAxis),
+                                           camera.sliceVal);
+            verts.reserve(sm.triVertices.size() * 3);
+            for (const auto& tv : sm.triVertices) {
+                verts.push_back(tv.x); verts.push_back(tv.y); verts.push_back(tv.z);
+            }
+        } else {
+            const ProjectedMesh pm = projectMesh(*e.mesh, viewFromLocal,
+                                                 camera.projectionStyle == ProjectionStyle::Perspective,
+                                                 camera.focal4, camera.wOffset);
+            verts.reserve(pm.triVertices.size() * 3);
+            for (const auto& tv : pm.triVertices) {
+                verts.push_back(tv.x); verts.push_back(tv.y); verts.push_back(tv.z);
+            }
+        }
+
+        for (size_t i = 0; i + 8 < verts.size(); i += 9) {
+            float ax, ay, aw, bx, by, bw, cx, cy, cw;
+            applyVP(verts[i + 0], verts[i + 1], verts[i + 2], ax, ay, aw);
+            applyVP(verts[i + 3], verts[i + 4], verts[i + 5], bx, by, bw);
+            applyVP(verts[i + 6], verts[i + 7], verts[i + 8], cx, cy, cw);
+            if (aw <= 1e-4f || bw <= 1e-4f || cw <= 1e-4f) continue;
+            const float ndcAx = ax / aw, ndcAy = ay / aw;
+            const float ndcBx = bx / bw, ndcBy = by / bw;
+            const float ndcCx = cx / cw, ndcCy = cy / cw;
+
+            const float d1 = sign(ndcX, ndcY, ndcAx, ndcAy, ndcBx, ndcBy);
+            const float d2 = sign(ndcX, ndcY, ndcBx, ndcBy, ndcCx, ndcCy);
+            const float d3 = sign(ndcX, ndcY, ndcCx, ndcCy, ndcAx, ndcAy);
+            const bool hasNeg = (d1 < 0) || (d2 < 0) || (d3 < 0);
+            const bool hasPos = (d1 > 0) || (d2 > 0) || (d3 > 0);
+            if (hasNeg && hasPos) continue;
+
+            // Average NDC z across triangle vertices as a depth estimate.
+            const float az = (VP[2]*verts[i+0] + VP[6]*verts[i+1] + VP[10]*verts[i+2] + VP[14]) / aw;
+            const float bz = (VP[2]*verts[i+3] + VP[6]*verts[i+4] + VP[10]*verts[i+5] + VP[14]) / bw;
+            const float cz = (VP[2]*verts[i+6] + VP[6]*verts[i+7] + VP[10]*verts[i+8] + VP[14]) / cw;
+            const float zAvg = (az + bz + cz) * (1.f / 3.f);
+            if (zAvg < bestZ) {
+                bestZ  = zAvg;
+                bestId = e.id;
+            }
+        }
+    }
+
+    return bestId;
 }
 
 } // namespace hopf::render

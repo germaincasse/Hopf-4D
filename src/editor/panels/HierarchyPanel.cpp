@@ -40,6 +40,34 @@ void renderAddObjectMenu(EditorContext& ctx) {
         if (ImGui::MenuItem("Prism"))       addPrimitive(ctx, geometry::PrimitiveType::Prism3D);
         ImGui::EndMenu();
     }
+    if (ImGui::BeginMenu("Add Light")) {
+        if (ImGui::MenuItem("Directional")) {
+            if (ctx.scene) {
+                auto& e = ctx.scene->addEntity("Light");
+                e.light = scene::DirectionalLight{};
+                ctx.selected = e.id;
+            }
+        }
+        ImGui::EndMenu();
+    }
+    if (ImGui::BeginMenu("Add Camera")) {
+        if (ImGui::MenuItem("Camera2D") && ctx.scene) {
+            auto& e = ctx.scene->addEntity("Camera2D");
+            e.camera2D = scene::Camera2DComponent{};
+            ctx.selected = e.id;
+        }
+        if (ImGui::MenuItem("Camera3D") && ctx.scene) {
+            auto& e = ctx.scene->addEntity("Camera3D");
+            e.camera3D = scene::Camera3DComponent{};
+            ctx.selected = e.id;
+        }
+        if (ImGui::MenuItem("Camera4D") && ctx.scene) {
+            auto& e = ctx.scene->addEntity("Camera4D");
+            e.camera4D = scene::Camera4DComponent{};
+            ctx.selected = e.id;
+        }
+        ImGui::EndMenu();
+    }
     if (ImGui::BeginMenu("Add 4D")) {
         if (ImGui::MenuItem("Tesseract (8-cell)"))         addPrimitive(ctx, geometry::PrimitiveType::Tesseract);
         if (ImGui::MenuItem("Pentachoron (5-cell)"))       addPrimitive(ctx, geometry::PrimitiveType::Pentachoron);
@@ -47,6 +75,12 @@ void renderAddObjectMenu(EditorContext& ctx) {
         if (ImGui::MenuItem("Icositetrachoron (24-cell)")) addPrimitive(ctx, geometry::PrimitiveType::Icositetrachoron);
         if (ImGui::MenuItem("Tetrahedral prism"))          addPrimitive(ctx, geometry::PrimitiveType::TetrahedralPrism);
         if (ImGui::MenuItem("Cubical pyramid"))            addPrimitive(ctx, geometry::PrimitiveType::CubicalPyramid);
+        if (ImGui::MenuItem("Octahedral prism"))           addPrimitive(ctx, geometry::PrimitiveType::OctahedralPrism);
+        if (ImGui::MenuItem("Icosahedral prism"))          addPrimitive(ctx, geometry::PrimitiveType::IcosahedralPrism);
+        if (ImGui::MenuItem("Cubinder"))                   addPrimitive(ctx, geometry::PrimitiveType::Cubinder);
+        if (ImGui::MenuItem("Spherinder"))                 addPrimitive(ctx, geometry::PrimitiveType::Spherinder);
+        if (ImGui::MenuItem("Duoprism (3-3)"))             addPrimitive(ctx, geometry::PrimitiveType::Duoprism33);
+        if (ImGui::MenuItem("Duoprism (5-5)"))             addPrimitive(ctx, geometry::PrimitiveType::Duoprism55);
         ImGui::EndMenu();
     }
 }

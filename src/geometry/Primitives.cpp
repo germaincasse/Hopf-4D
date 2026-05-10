@@ -30,6 +30,12 @@ const char* primitiveLabel(PrimitiveType type) {
         case PrimitiveType::Icositetrachoron: return "Icositetrachoron (24-cell)";
         case PrimitiveType::TetrahedralPrism: return "Tetrahedral prism";
         case PrimitiveType::CubicalPyramid:   return "Cubical pyramid";
+        case PrimitiveType::OctahedralPrism:  return "Octahedral prism";
+        case PrimitiveType::IcosahedralPrism: return "Icosahedral prism";
+        case PrimitiveType::Cubinder:         return "Cubinder";
+        case PrimitiveType::Spherinder:       return "Spherinder";
+        case PrimitiveType::Duoprism33:       return "Duoprism (3-3)";
+        case PrimitiveType::Duoprism55:       return "Duoprism (5-5)";
     }
     return "Unknown";
 }
@@ -74,6 +80,12 @@ bool primitiveIs4D(PrimitiveType type) {
         case PrimitiveType::Icositetrachoron:
         case PrimitiveType::TetrahedralPrism:
         case PrimitiveType::CubicalPyramid:
+        case PrimitiveType::OctahedralPrism:
+        case PrimitiveType::IcosahedralPrism:
+        case PrimitiveType::Cubinder:
+        case PrimitiveType::Spherinder:
+        case PrimitiveType::Duoprism33:
+        case PrimitiveType::Duoprism55:
             return true;
         default:
             return false;
@@ -106,6 +118,12 @@ Mesh4D buildPrimitive(PrimitiveType type, float size) {
         case PrimitiveType::Icositetrachoron: return detail::buildIcositetrachoron(size);
         case PrimitiveType::TetrahedralPrism: return detail::buildTetrahedralPrism(size);
         case PrimitiveType::CubicalPyramid:   return detail::buildCubicalPyramid(size);
+        case PrimitiveType::OctahedralPrism:  return detail::buildOctahedralPrism(size);
+        case PrimitiveType::IcosahedralPrism: return detail::buildIcosahedralPrism(size);
+        case PrimitiveType::Cubinder:         return detail::buildCubinder(size);
+        case PrimitiveType::Spherinder:       return detail::buildSpherinder(size);
+        case PrimitiveType::Duoprism33:       return detail::buildDuoprism33(size);
+        case PrimitiveType::Duoprism55:       return detail::buildDuoprism55(size);
     }
     return {};
 }

@@ -15,6 +15,8 @@
 #include <backends/imgui_impl_glfw.h>
 #include <backends/imgui_impl_opengl3.h>
 
+#include <algorithm>
+
 namespace hopf::editor {
 
 Editor::~Editor() {
@@ -105,10 +107,13 @@ void Editor::init(GLFWwindow* window) {
     c[ImGuiCol_TextSelectedBg]        = ImVec4(accent.x, accent.y, accent.z, 0.40f);
     c[ImGuiCol_NavHighlight]          = accent;
 
+    m_baseStyle = style;
+    applyUiScale();
+
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init("#version 460");
 
-    m_panels.emplace_back(std::make_unique<ViewportPanel>());
+    m_panels.emplace_back(std::make_unique<ViewportPanel>(0));
     m_panels.emplace_back(std::make_unique<HierarchyPanel>());
     m_panels.emplace_back(std::make_unique<InspectorPanel>());
     m_panels.emplace_back(std::make_unique<ConsolePanel>());
@@ -185,6 +190,10 @@ void Editor::renderUI(scene::Scene& scene) {
                 }
             }
             ImGui::Separator();
+            if (ImGui::MenuItem("Add Viewport")) {
+                m_panels.emplace_back(std::make_unique<ViewportPanel>(m_nextViewportId++));
+            }
+            ImGui::Separator();
             if (ImGui::MenuItem("Reset layout")) m_layoutBuilt = false;
             ImGui::EndMenu();
         }
@@ -206,12 +215,32 @@ void Editor::renderUI(scene::Scene& scene) {
     processShortcuts();
 }
 
-void Editor::processShortcuts() {
-    if (!m_ctx.scene) return;
-    const ImGuiIO& io = ImGui::GetIO();
-    if (io.WantTextInput) return;
+void Editor::applyUiScale() {
+    ImGuiStyle& s = ImGui::GetStyle();
+    s = m_baseStyle;
+    s.ScaleAllSizes(m_uiScale);
+    ImGui::GetIO().FontGlobalScale = m_uiScale;
+}
 
+void Editor::processShortcuts() {
+    const ImGuiIO& io = ImGui::GetIO();
     const bool ctrl = io.KeyCtrl;
+
+    // UI zoom shortcuts work even while typing in a text field.
+    if (ctrl) {
+        const bool zoomIn  = ImGui::IsKeyPressed(ImGuiKey_Equal,        false)
+                          || ImGui::IsKeyPressed(ImGuiKey_KeypadAdd,    false);
+        const bool zoomOut = ImGui::IsKeyPressed(ImGuiKey_Minus,        false)
+                          || ImGui::IsKeyPressed(ImGuiKey_KeypadSubtract, false);
+        const bool reset   = ImGui::IsKeyPressed(ImGuiKey_0,            false)
+                          || ImGui::IsKeyPressed(ImGuiKey_Keypad0,      false);
+        if (zoomIn)  { m_uiScale = std::min(3.0f, m_uiScale * 1.1f); applyUiScale(); }
+        if (zoomOut) { m_uiScale = std::max(0.5f, m_uiScale / 1.1f); applyUiScale(); }
+        if (reset)   { m_uiScale = 1.0f;                              applyUiScale(); }
+    }
+
+    if (!m_ctx.scene) return;
+    if (io.WantTextInput) return;
 
     if (m_ctx.selected != 0 && ImGui::IsKeyPressed(ImGuiKey_Delete, false)) {
         m_ctx.scene->removeEntity(m_ctx.selected);

@@ -2,6 +2,7 @@
 
 #include "render/Camera4D.h"
 #include "render/Shader.h"
+#include "scene/Entity.h"
 
 #include <array>
 #include <cstdint>
@@ -38,6 +39,11 @@ public:
     // Indexed by axis: 0=X, 1=Y, 2=Z, 3=W. Populated during render().
     const std::array<AxisScreenLabel, 4>& axisLabels() const { return m_axisLabels; }
 
+    // CPU-side picking. (u, v) are pixel coords inside the viewport image (top-left origin).
+    // Returns 0 if no entity was hit.
+    scene::EntityId pickEntityAt(const scene::Scene& scene, const Camera4D& camera,
+                                 float u, float v) const;
+
 private:
     void ensureGpuResources();
     void destroyFramebuffer();
@@ -56,7 +62,6 @@ private:
 
     uint32_t m_triVao = 0;
     uint32_t m_triVbo = 0;
-    uint32_t m_triEbo = 0;
 
     Shader m_lineShader;
     Shader m_triShader;

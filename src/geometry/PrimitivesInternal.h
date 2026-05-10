@@ -28,5 +28,11 @@ Mesh4D buildHexadecachoron(float size);
 Mesh4D buildIcositetrachoron(float size);
 Mesh4D buildTetrahedralPrism(float size);
 Mesh4D buildCubicalPyramid(float size);
+Mesh4D buildOctahedralPrism(float size);
+Mesh4D buildIcosahedralPrism(float size);
+Mesh4D buildCubinder(float size);
+Mesh4D buildSpherinder(float size);
+Mesh4D buildDuoprism33(float size);
+Mesh4D buildDuoprism55(float size);
 
 } // namespace hopf::geometry::detail

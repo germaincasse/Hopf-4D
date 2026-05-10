@@ -267,6 +267,118 @@ Mesh4D buildTetrahedralPrism(float size) {
     return m;
 }
 
+// Extrude a 3D base mesh (vertices at w=0) along the W axis. The result is a 4D prism
+// bounded by 2 copies of the base plus lateral quads, tetrahedrized via fan from the
+// 4D centroid (origin).
+Mesh4D extrudeAlongW(const Mesh4D& base, float halfHeight, const char* name) {
+    Mesh4D m;
+    m.name = name;
+    const uint32_t N = static_cast<uint32_t>(base.vertices.size());
+
+    m.vertices.reserve(N * 2 + 1);
+    for (const auto& v : base.vertices) m.vertices.push_back({v.x, v.y, v.z, -halfHeight});
+    for (const auto& v : base.vertices) m.vertices.push_back({v.x, v.y, v.z,  halfHeight});
+
+    for (const auto& e : base.edges) {
+        m.edges.push_back({e[0], e[1]});
+        m.edges.push_back({e[0] + N, e[1] + N});
+    }
+    for (uint32_t i = 0; i < N; ++i) m.edges.push_back({i, i + N});
+
+    for (const auto& t : base.triangles) {
+        m.triangles.push_back({t[0], t[1], t[2]});
+        m.triangles.push_back({t[0] + N, t[2] + N, t[1] + N});
+    }
+    for (const auto& e : base.edges) {
+        const uint32_t a = e[0], b = e[1];
+        const uint32_t at = a + N, bt = b + N;
+        m.triangles.push_back({a, b, bt});
+        m.triangles.push_back({a, bt, at});
+    }
+
+    const uint32_t centroid = static_cast<uint32_t>(m.vertices.size());
+    m.vertices.push_back({0, 0, 0, 0});
+    for (const auto& tri : m.triangles) {
+        m.tetrahedra.push_back({tri[0], tri[1], tri[2], centroid});
+    }
+    return m;
+}
+
+Mesh4D buildOctahedralPrism(float size) {
+    return extrudeAlongW(buildOctahedron3D(size), size * 0.5f, "Octahedral prism");
+}
+
+Mesh4D buildIcosahedralPrism(float size) {
+    return extrudeAlongW(buildIcosahedron3D(size), size * 0.5f, "Icosahedral prism");
+}
+
+Mesh4D buildCubinder(float size) {
+    return extrudeAlongW(buildCylinder3D(size), size * 0.5f, "Cubinder");
+}
+
+Mesh4D buildSpherinder(float size) {
+    return extrudeAlongW(buildSphere3D(size), size * 0.5f, "Spherinder");
+}
+
+Mesh4D buildDuoprism(int n, int m, float size, const char* name) {
+    Mesh4D mesh;
+    mesh.name = name;
+    const float r = size * 0.5f;
+    constexpr float kPi = 3.14159265358979323846f;
+
+    auto idx = [&](int i, int j) { return uint32_t(i * m + j); };
+
+    for (int i = 0; i < n; ++i) {
+        const float ai = 2.f * kPi * float(i) / float(n);
+        const float xy0 = r * std::cos(ai);
+        const float xy1 = r * std::sin(ai);
+        for (int j = 0; j < m; ++j) {
+            const float aj = 2.f * kPi * float(j) / float(m);
+            mesh.vertices.push_back({xy0, xy1, r * std::cos(aj), r * std::sin(aj)});
+        }
+    }
+
+    for (int i = 0; i < n; ++i) {
+        for (int j = 0; j < m; ++j) {
+            mesh.edges.push_back({idx(i, j), idx((i + 1) % n, j)});
+            mesh.edges.push_back({idx(i, j), idx(i, (j + 1) % m)});
+        }
+    }
+
+    // Polygon faces: m copies of the n-gon + n copies of the m-gon (fan-triangulated).
+    for (int j = 0; j < m; ++j) {
+        for (int i = 1; i + 1 < n; ++i) {
+            mesh.triangles.push_back({idx(0, j), idx(i, j), idx(i + 1, j)});
+        }
+    }
+    for (int i = 0; i < n; ++i) {
+        for (int j = 1; j + 1 < m; ++j) {
+            mesh.triangles.push_back({idx(i, 0), idx(i, j), idx(i, j + 1)});
+        }
+    }
+    // n*m square faces, one per (i, j).
+    for (int i = 0; i < n; ++i) {
+        for (int j = 0; j < m; ++j) {
+            const uint32_t a = idx(i, j);
+            const uint32_t b = idx((i + 1) % n, j);
+            const uint32_t c = idx((i + 1) % n, (j + 1) % m);
+            const uint32_t d = idx(i, (j + 1) % m);
+            mesh.triangles.push_back({a, b, c});
+            mesh.triangles.push_back({a, c, d});
+        }
+    }
+
+    const uint32_t centroid = static_cast<uint32_t>(mesh.vertices.size());
+    mesh.vertices.push_back({0, 0, 0, 0});
+    for (const auto& tri : mesh.triangles) {
+        mesh.tetrahedra.push_back({tri[0], tri[1], tri[2], centroid});
+    }
+    return mesh;
+}
+
+Mesh4D buildDuoprism33(float size) { return buildDuoprism(3, 3, size, "Duoprism (3-3)"); }
+Mesh4D buildDuoprism55(float size) { return buildDuoprism(5, 5, size, "Duoprism (5-5)"); }
+
 Mesh4D buildCubicalPyramid(float size) {
     Mesh4D m;
     m.name = "Cubical pyramid";

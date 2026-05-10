@@ -38,6 +38,18 @@ inline Mat4 perspective(float fovYRad, float aspect, float zn, float zf) {
     return m;
 }
 
+inline Mat4 ortho(float left, float right, float bottom, float top, float zn, float zf) {
+    Mat4 m{};
+    m[0]  =  2.f / (right - left);
+    m[5]  =  2.f / (top - bottom);
+    m[10] = -2.f / (zf - zn);
+    m[12] = -(right + left)   / (right - left);
+    m[13] = -(top   + bottom) / (top   - bottom);
+    m[14] = -(zf    + zn)     / (zf    - zn);
+    m[15] = 1.f;
+    return m;
+}
+
 inline Mat4 lookAt(float ex, float ey, float ez,
                    float cx, float cy, float cz,
                    float ux, float uy, float uz)

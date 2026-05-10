@@ -32,6 +32,12 @@ enum class PrimitiveType {
     Icositetrachoron,
     TetrahedralPrism,
     CubicalPyramid,
+    OctahedralPrism,
+    IcosahedralPrism,
+    Cubinder,
+    Spherinder,
+    Duoprism33,
+    Duoprism55,
 };
 
 const char* primitiveLabel(PrimitiveType type);

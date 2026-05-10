@@ -105,6 +105,57 @@ void InspectorPanel::render(EditorContext& ctx) {
         dragPlaneAxes("zw", "auto", entity->autoRotate.zw, 0.01f, -5.f, 5.f);
     }
 
+    if (entity->light.has_value()) {
+        if (ImGui::CollapsingHeader("Directional Light", ImGuiTreeNodeFlags_DefaultOpen)) {
+            ImGui::TextDisabled("Direction = transform.rotation applied to (0, -1, 0, 0).");
+            ImGui::DragFloat("Intensity##light", &entity->light->intensity, 0.05f, 0.f, 10.f);
+            if (ImGui::Button("Remove light")) entity->light.reset();
+        }
+    }
+
+    if (entity->camera2D.has_value()) {
+        if (ImGui::CollapsingHeader("Camera 2D", ImGuiTreeNodeFlags_DefaultOpen)) {
+            ImGui::DragFloat("Ortho size##c2d", &entity->camera2D->orthoSize, 0.05f, 0.1f, 100.f);
+            ImGui::DragFloat("Near##c2d",       &entity->camera2D->zNear, 0.5f);
+            ImGui::DragFloat("Far##c2d",        &entity->camera2D->zFar,  0.5f);
+            if (ImGui::Button("Remove##c2d")) entity->camera2D.reset();
+        }
+    }
+    if (entity->camera3D.has_value()) {
+        if (ImGui::CollapsingHeader("Camera 3D", ImGuiTreeNodeFlags_DefaultOpen)) {
+            ImGui::Checkbox("Perspective##c3d", &entity->camera3D->perspective);
+            if (entity->camera3D->perspective) {
+                ImGui::DragFloat("Fov Y (deg)##c3d", &entity->camera3D->fovYDeg, 0.5f, 5.f, 170.f);
+            } else {
+                ImGui::DragFloat("Ortho half-H##c3d", &entity->camera3D->orthoHalfH, 0.05f, 0.1f, 100.f);
+            }
+            ImGui::DragFloat("Near##c3d", &entity->camera3D->zNear, 0.01f, 0.001f, 100.f);
+            ImGui::DragFloat("Far##c3d",  &entity->camera3D->zFar,  1.0f,  1.f,    10000.f);
+            if (ImGui::Button("Remove##c3d")) entity->camera3D.reset();
+        }
+    }
+    if (entity->camera4D.has_value()) {
+        if (ImGui::CollapsingHeader("Camera 4D", ImGuiTreeNodeFlags_DefaultOpen)) {
+            const char* modes[] = { "Projection", "Slice" };
+            int m = static_cast<int>(entity->camera4D->mode);
+            if (ImGui::Combo("Mode##c4d", &m, modes, IM_ARRAYSIZE(modes))) {
+                entity->camera4D->mode = static_cast<scene::Camera4DComponent::Mode>(m);
+            }
+            if (entity->camera4D->mode == scene::Camera4DComponent::Mode::Projection) {
+                ImGui::Checkbox("Perspective 4D##c4d", &entity->camera4D->perspective4);
+                if (entity->camera4D->perspective4) {
+                    ImGui::DragFloat("Focal4##c4d",  &entity->camera4D->focal4,  0.05f, 0.5f, 20.f);
+                    ImGui::DragFloat("wOffset##c4d", &entity->camera4D->wOffset, 0.05f, -10.f, 10.f);
+                }
+            } else {
+                const char* axes[] = { "X", "Y", "Z", "W" };
+                ImGui::Combo("Slice axis##c4d", &entity->camera4D->sliceAxis, axes, IM_ARRAYSIZE(axes));
+                ImGui::DragFloat("Slice value##c4d", &entity->camera4D->sliceVal, 0.01f, -2.f, 2.f);
+            }
+            if (ImGui::Button("Remove##c4d")) entity->camera4D.reset();
+        }
+    }
+
     if (ImGui::CollapsingHeader("Mesh", ImGuiTreeNodeFlags_DefaultOpen)) {
         if (entity->mesh) {
             ImGui::Text("name      : %s", entity->mesh->name.c_str());
