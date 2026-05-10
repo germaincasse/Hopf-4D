@@ -10,7 +10,7 @@
 namespace hopf::geometry {
 
 // Canonical 4D mesh container. Cells (3D-bounded volumes) are stored as tetrahedra so the
-// slicer can stay simple — non-tetrahedral cells must be triangulated at build time.
+// slicer can stay simple. Non-tetrahedral cells must be triangulated at build time.
 struct Mesh4D {
     std::vector<math::Vec4>              vertices;
     std::vector<std::array<uint32_t, 2>> edges;

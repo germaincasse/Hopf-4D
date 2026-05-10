@@ -5,7 +5,7 @@
 namespace hopf::math {
 
 // 4D rotation as six per-plane angles (xy, xz, xw, yz, yw, zw), composed in fixed order.
-// Editor-friendly but not commutative — for animation pipelines we'd switch to bivector rotors.
+// Editor-friendly but not commutative; for animation pipelines we'd switch to bivector rotors.
 struct Rotor4 {
     float xy = 0.f;
     float xz = 0.f;

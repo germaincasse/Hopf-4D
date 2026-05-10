@@ -34,19 +34,19 @@ external/cmake/  Dependencies.cmake (FetchContent fetches GLFW, glad2, ImGui, Ca
 
 ## 4D math
 
-- **`Vec4`** — point or direction in `(x, y, z, w)`.
-- **`Mat5`** — 5x5 column-major matrix for affine 4D transforms (the 5th coordinate is the homogeneous one). Translation, scale, and the six plane rotations all compose into a single matrix.
-- **`Rotor4`** — six per-plane rotation angles (`xy`, `xz`, `xw`, `yz`, `yw`, `zw`). 4D has six independent rotation planes — there is no single "axis of rotation" the way there is in 3D. The representation isn't free of gimbal-lock-like artifacts (rotations don't commute) but it's editor-friendly. A bivector-rotor implementation can replace it later without touching callers.
-- **`Mat4`** — column-major 4x4, used for the 3D view/projection stage that follows the 4D->3D step.
+- **`Vec4`**: point or direction in `(x, y, z, w)`.
+- **`Mat5`**: 5x5 column-major matrix for affine 4D transforms (the 5th coordinate is the homogeneous one). Translation, scale, and the six plane rotations all compose into a single matrix.
+- **`Rotor4`**: six per-plane rotation angles (`xy`, `xz`, `xw`, `yz`, `yw`, `zw`). 4D has six independent rotation planes, so there is no single "axis of rotation" the way there is in 3D. The representation isn't free of gimbal-lock-like artifacts (rotations don't commute) but it's editor-friendly. A bivector-rotor implementation can replace it later without touching callers.
+- **`Mat4`**: column-major 4x4, used for the 3D view/projection stage that follows the 4D->3D step.
 
 ## Geometry
 
 `Mesh4D` is the canonical container:
 
-- `vertices`   — `Vec4`
-- `edges`      — pairs of vertex indices (wireframe)
-- `triangles`  — surface triangles (solid styles)
-- `tetrahedra` — 3-cells, used by the Slicer; non-tetrahedral cells must be triangulated at build time
+- `vertices`   : `Vec4`
+- `edges`      : pairs of vertex indices (wireframe)
+- `triangles`  : surface triangles (solid styles)
+- `tetrahedra` : 3-cells, used by the Slicer; non-tetrahedral cells must be triangulated at build time
 
 Primitives ship in `Primitives.cpp`: cube, tetrahedron, octahedron, UV sphere, tesseract (8-cell), pentachoron (5-cell), hexadecachoron (16-cell). 3D primitives live at `w = 0` (no tetrahedra, hidden in slice mode unless `sliceW = 0`).
 
@@ -72,14 +72,14 @@ Drops `w` (parallel) or scales `xyz` by `focal4 / (w + wOffset)` (perspective) t
 
 Dear ImGui dockspace with panels:
 
-- **Viewport** — owns a `Camera4D` and a `ViewportRenderer`.
-- **Hierarchy** — entity tree with right-click add menu and drag-drop reorder.
-- **Inspector** — properties of the selected entity (transform, auto-rotate, mesh stats).
-- **Console** — log sink reading from `core::Logger`.
-- **Files** — read-only project tree.
+- **Viewport**: owns a `Camera4D` and a `ViewportRenderer`.
+- **Hierarchy**: entity tree with right-click add menu and drag-drop reorder.
+- **Inspector**: properties of the selected entity (transform, auto-rotate, mesh stats).
+- **Console**: log sink reading from `core::Logger`.
+- **Files**: read-only project tree.
 
 Panels are stateless w.r.t. the scene; they read/write through `EditorContext` which the `Editor` owns and threads through each render call. Selection, clipboard, and the active scene pointer all live there.
 
 ## Why OpenGL
 
-OpenGL 4.6 core is the lowest-friction backend on Windows that still gives us shader-based pipelines. The renderer is small and isolated — switching to D3D11 or Vulkan later is a `render/` rewrite, not an engine rewrite.
+OpenGL 4.6 core is the lowest-friction backend on Windows that still gives us shader-based pipelines. The renderer is small and isolated, so switching to D3D11 or Vulkan later is a `render/` rewrite, not an engine rewrite.

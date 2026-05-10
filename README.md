@@ -2,7 +2,7 @@
 
 A 4D game engine written in C++ for Windows. Like Unity or Godot, but for games where the world has four spatial dimensions.
 
-The name nods to the [Hopf fibration](https://en.wikipedia.org/wiki/Hopf_fibration), the canonical map from the 3-sphere to the 2-sphere — a small reminder that 4D space is rich, structured, and worth visiting.
+The name nods to the [Hopf fibration](https://en.wikipedia.org/wiki/Hopf_fibration), the canonical map from the 3-sphere to the 2-sphere. A small reminder that 4D space is rich, structured, and worth visiting.
 
 ![Hopf editor with a few 3D and 4D primitives in projection / depth-wireframe](docs/images/screenshot%201.png)
 
@@ -10,8 +10,8 @@ The name nods to the [Hopf fibration](https://en.wikipedia.org/wiki/Hopf_fibrati
 
 Two view modes per viewport:
 
-- **Slice** — render the 3D intersection of the scene with a hyperplane `w = w0`. Scrub the plane to see the cross-section move.
-- **Projection** — project the entire 4D scene to 3D (parallel or perspective along `w`), then render.
+- **Slice**: render the 3D intersection of the scene with a hyperplane `w = w0`. Scrub the plane to see the cross-section move.
+- **Projection**: project the entire 4D scene to 3D (parallel or perspective along `w`), then render.
 
 Each viewport picks a display style independently: `Wire`, `Depth` (cool/warm gradient on `w`), `Solid (unlit)`, `Solid (lit)`.
 

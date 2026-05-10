@@ -1,10 +1,12 @@
 #include "editor/panels/ViewportPanel.h"
 
+#include "editor/AxisColors.h"
 #include "scene/Scene.h"
 
 #include <imgui.h>
 
 #include <cmath>
+#include <cstdio>
 
 namespace hopf::editor {
 
@@ -28,6 +30,15 @@ void verticalSep() {
     ImGui::SameLine();
     ImGui::TextUnformatted("|");
     ImGui::SameLine();
+}
+
+void planeSlider(const char* plane, float& val, float minV, float maxV) {
+    textAxisColored(plane);
+    ImGui::SameLine();
+    char id[16];
+    std::snprintf(id, sizeof(id), "##cam_%s", plane);
+    ImGui::SetNextItemWidth(180.f);
+    ImGui::SliderFloat(id, &val, minV, maxV);
 }
 
 } // namespace
@@ -101,12 +112,13 @@ void ViewportPanel::render(EditorContext& ctx) {
         if (ImGui::BeginPopup("##cam4dPopup")) {
             ImGui::TextDisabled("Camera 4D rotation (rad)");
             ImGui::Separator();
-            ImGui::SetNextItemWidth(180.f); ImGui::SliderFloat("xy##cam", &m_camera.rotation4.xy, -3.14159f, 3.14159f);
-            ImGui::SetNextItemWidth(180.f); ImGui::SliderFloat("xz##cam", &m_camera.rotation4.xz, -3.14159f, 3.14159f);
-            ImGui::SetNextItemWidth(180.f); ImGui::SliderFloat("xw##cam", &m_camera.rotation4.xw, -3.14159f, 3.14159f);
-            ImGui::SetNextItemWidth(180.f); ImGui::SliderFloat("yz##cam", &m_camera.rotation4.yz, -3.14159f, 3.14159f);
-            ImGui::SetNextItemWidth(180.f); ImGui::SliderFloat("yw##cam", &m_camera.rotation4.yw, -3.14159f, 3.14159f);
-            ImGui::SetNextItemWidth(180.f); ImGui::SliderFloat("zw##cam", &m_camera.rotation4.zw, -3.14159f, 3.14159f);
+            constexpr float kPi = 3.14159f;
+            planeSlider("xy", m_camera.rotation4.xy, -kPi, kPi);
+            planeSlider("xz", m_camera.rotation4.xz, -kPi, kPi);
+            planeSlider("xw", m_camera.rotation4.xw, -kPi, kPi);
+            planeSlider("yz", m_camera.rotation4.yz, -kPi, kPi);
+            planeSlider("yw", m_camera.rotation4.yw, -kPi, kPi);
+            planeSlider("zw", m_camera.rotation4.zw, -kPi, kPi);
             if (ImGui::Button("Reset")) m_camera.rotation4 = {};
             ImGui::EndPopup();
         }
@@ -132,6 +144,20 @@ void ViewportPanel::render(EditorContext& ctx) {
                      ImVec2(static_cast<float>(m_renderer.width()),
                             static_cast<float>(m_renderer.height())),
                      ImVec2(0, 1), ImVec2(1, 0));
+
+        {
+            const ImVec2 imgMin = ImGui::GetItemRectMin();
+            const auto& labels = m_renderer.axisLabels();
+            const char* axisChar[4] = {"x", "y", "z", "w"};
+            const ImVec4 axisVec[4] = { kAxisColorX, kAxisColorY, kAxisColorZ, kAxisColorW };
+            ImDrawList* dl = ImGui::GetWindowDrawList();
+            for (int i = 0; i < 4; ++i) {
+                if (!labels[i].visible) continue;
+                const ImU32 col = ImGui::ColorConvertFloat4ToU32(axisVec[i]);
+                const ImVec2 pos(imgMin.x + labels[i].u + 5.f, imgMin.y + labels[i].v - 6.f);
+                dl->AddText(pos, col, axisChar[i]);
+            }
+        }
 
         const bool hovered = ImGui::IsItemHovered();
         const ImGuiIO& io = ImGui::GetIO();

@@ -217,6 +217,38 @@ void ViewportRenderer::render(const scene::Scene& scene, const Camera4D& camera)
     m_lineShader.setMat4("uViewProj", VP.data());
     drawWorldAxes(m_lineVao, m_lineVbo, m_lineEbo, m_lineShader, viewFromWorld, camera);
 
+    {
+        // Cache the screen-space tip of each gizmo axis so the editor can overlay letters.
+        const float L = 1.f;
+        const math::Vec4 axisLocal[4] = {
+            {L, 0, 0, 0}, {0, L, 0, 0}, {0, 0, L, 0}, {0, 0, 0, L},
+        };
+        const int axisCount = (camera.mode == ViewMode::Projection) ? 4 : 3;
+        for (int i = 0; i < 4; ++i) {
+            m_axisLabels[i].visible = false;
+            if (i >= axisCount) continue;
+
+            const math::Vec4 vw = viewFromWorld.transformPoint(axisLocal[i]);
+            float p3x = vw.x, p3y = vw.y, p3z = vw.z;
+            if (camera.mode == ViewMode::Projection && camera.perspective4) {
+                const float wp = vw.w + camera.wOffset;
+                const float k  = wp != 0.f ? camera.focal4 / wp : 1.f;
+                p3x *= k; p3y *= k; p3z *= k;
+            }
+            const float clipX = VP[0]*p3x + VP[4]*p3y + VP[8] *p3z + VP[12];
+            const float clipY = VP[1]*p3x + VP[5]*p3y + VP[9] *p3z + VP[13];
+            const float clipW = VP[3]*p3x + VP[7]*p3y + VP[11]*p3z + VP[15];
+            if (clipW <= 1e-4f) continue;
+
+            const float ndcX = clipX / clipW;
+            const float ndcY = clipY / clipW;
+            m_axisLabels[i].u = (ndcX + 1.f) * 0.5f * float(m_width);
+            // Flip Y: GL's NDC has +Y up, ImGui's image coords have +Y down.
+            m_axisLabels[i].v = (1.f - (ndcY + 1.f) * 0.5f) * float(m_height);
+            m_axisLabels[i].visible = true;
+        }
+    }
+
     const bool isSolid = camera.style == DisplayStyle::SolidUnlit ||
                          camera.style == DisplayStyle::SolidLit;
     const bool isLit   = camera.style == DisplayStyle::SolidLit;
