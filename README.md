@@ -4,6 +4,8 @@ A 4D game engine written in C++ for Windows. Like Unity or Godot, but for games 
 
 The name nods to the [Hopf fibration](https://en.wikipedia.org/wiki/Hopf_fibration), the canonical map from the 3-sphere to the 2-sphere — a small reminder that 4D space is rich, structured, and worth visiting.
 
+![Hopf editor with a few 3D and 4D primitives in projection / depth-wireframe](docs/images/screenshot%201.png)
+
 ## Visualization
 
 Two view modes per viewport:
@@ -63,7 +65,7 @@ To skip building tests, configure with `-DHOPF_BUILD_TESTS=OFF`.
 - [x] Slice and projection modes, four display styles
 - [x] Pivot orbit camera + 4D camera rotation
 - [x] Catch2 unit tests for math, geometry, scene
-- [ ] More 4D primitives (24-cell, 120-cell, 600-cell, hypersphere)
+- [ ] More 4D primitives (120-cell, 600-cell, hypersphere)
 - [ ] Project file format + asset import
 - [ ] Scripting layer
 - [ ] 4D physics
