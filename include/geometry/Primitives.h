@@ -1,6 +1,6 @@
 #pragma once
 
-#include "hopf/geometry/Mesh4D.h"
+#include "geometry/Mesh4D.h"
 
 namespace hopf::geometry {
 

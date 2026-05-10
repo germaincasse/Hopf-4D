@@ -1,7 +1,7 @@
-#include "hopf/core/Application.h"
+#include "core/Application.h"
 
-#include "hopf/core/Logger.h"
-#include "hopf/geometry/Primitives.h"
+#include "core/Logger.h"
+#include "geometry/Primitives.h"
 
 #include <glad/gl.h>
 #include <GLFW/glfw3.h>

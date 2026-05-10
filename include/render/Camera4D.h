@@ -1,8 +1,8 @@
 #pragma once
 
-#include "hopf/math/Mat5.h"
-#include "hopf/math/Rotor4.h"
-#include "hopf/math/Vec4.h"
+#include "math/Mat5.h"
+#include "math/Rotor4.h"
+#include "math/Vec4.h"
 
 namespace hopf::render {
 

@@ -25,7 +25,7 @@ Windows-only for now.
 ## Repository layout
 
 ```
-include/hopf/    public headers, organized by subsystem
+include/         public headers, organized by subsystem
 src/             implementation files
 tests/           Catch2 unit tests
 external/cmake/  third-party fetch/build helpers

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "hopf/geometry/Mesh4D.h"
-#include "hopf/scene/Transform4D.h"
+#include "geometry/Mesh4D.h"
+#include "scene/Transform4D.h"
 
 #include <cstdint>
 #include <string>

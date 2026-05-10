@@ -1,8 +1,8 @@
 #pragma once
 
-#include "hopf/editor/panels/Panel.h"
-#include "hopf/render/Camera4D.h"
-#include "hopf/render/ViewportRenderer.h"
+#include "editor/panels/Panel.h"
+#include "render/Camera4D.h"
+#include "render/ViewportRenderer.h"
 
 namespace hopf::editor {
 

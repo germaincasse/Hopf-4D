@@ -1,8 +1,8 @@
 #pragma once
 
-#include "hopf/editor/Editor.h"
-#include "hopf/platform/Window.h"
-#include "hopf/scene/Scene.h"
+#include "editor/Editor.h"
+#include "platform/Window.h"
+#include "scene/Scene.h"
 
 #include <memory>
 

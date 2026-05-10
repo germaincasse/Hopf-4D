@@ -1,6 +1,6 @@
 #pragma once
 
-#include "hopf/editor/EditorContext.h"
+#include "editor/EditorContext.h"
 
 namespace hopf::editor {
 

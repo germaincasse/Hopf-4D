@@ -1,7 +1,7 @@
-#include "hopf/editor/panels/HierarchyPanel.h"
+#include "editor/panels/HierarchyPanel.h"
 
-#include "hopf/geometry/Primitives.h"
-#include "hopf/scene/Scene.h"
+#include "geometry/Primitives.h"
+#include "scene/Scene.h"
 
 #include <imgui.h>
 

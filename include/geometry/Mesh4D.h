@@ -1,6 +1,6 @@
 #pragma once
 
-#include "hopf/math/Vec4.h"
+#include "math/Vec4.h"
 
 #include <array>
 #include <cstdint>

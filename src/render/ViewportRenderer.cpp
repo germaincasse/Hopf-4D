@@ -1,11 +1,11 @@
-#include "hopf/render/ViewportRenderer.h"
+#include "render/ViewportRenderer.h"
 
-#include "hopf/render/Projector.h"
-#include "hopf/render/Slicer.h"
-#include "hopf/render/ViewportShaders.h"
-#include "hopf/core/Logger.h"
-#include "hopf/math/Mat4.h"
-#include "hopf/scene/Scene.h"
+#include "render/Projector.h"
+#include "render/Slicer.h"
+#include "render/ViewportShaders.h"
+#include "core/Logger.h"
+#include "math/Mat4.h"
+#include "scene/Scene.h"
 
 #include <glad/gl.h>
 

@@ -26,10 +26,10 @@ core/                   Application loop, Logger
 ## File layout
 
 ```
-include/hopf/<sub>/  public headers
-src/<sub>/           implementations
-tests/               Catch2 unit tests
-external/cmake/      Dependencies.cmake (FetchContent fetches GLFW, glad2, ImGui, Catch2)
+include/<sub>/   public headers
+src/<sub>/       implementations
+tests/           Catch2 unit tests
+external/cmake/  Dependencies.cmake (FetchContent fetches GLFW, glad2, ImGui, Catch2)
 ```
 
 ## 4D math

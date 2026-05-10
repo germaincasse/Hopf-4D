@@ -1,6 +1,6 @@
 #include <catch2/catch_test_macros.hpp>
 
-#include "hopf/geometry/Primitives.h"
+#include "geometry/Primitives.h"
 
 using namespace hopf::geometry;
 

@@ -1,4 +1,4 @@
-#include "hopf/scene/Scene.h"
+#include "scene/Scene.h"
 
 namespace hopf::scene {
 

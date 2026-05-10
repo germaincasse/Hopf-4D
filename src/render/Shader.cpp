@@ -1,6 +1,6 @@
-#include "hopf/render/Shader.h"
+#include "render/Shader.h"
 
-#include "hopf/core/Logger.h"
+#include "core/Logger.h"
 
 #include <glad/gl.h>
 

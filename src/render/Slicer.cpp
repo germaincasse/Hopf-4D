@@ -1,4 +1,4 @@
-#include "hopf/render/Slicer.h"
+#include "render/Slicer.h"
 
 namespace hopf::render {
 

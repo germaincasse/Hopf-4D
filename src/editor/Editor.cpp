@@ -1,12 +1,12 @@
-#include "hopf/editor/Editor.h"
+#include "editor/Editor.h"
 
-#include "hopf/editor/panels/ConsolePanel.h"
-#include "hopf/editor/panels/FilesPanel.h"
-#include "hopf/editor/panels/HierarchyPanel.h"
-#include "hopf/editor/panels/InspectorPanel.h"
-#include "hopf/editor/panels/ViewportPanel.h"
+#include "editor/panels/ConsolePanel.h"
+#include "editor/panels/FilesPanel.h"
+#include "editor/panels/HierarchyPanel.h"
+#include "editor/panels/InspectorPanel.h"
+#include "editor/panels/ViewportPanel.h"
 
-#include "hopf/scene/Scene.h"
+#include "scene/Scene.h"
 
 #include <glad/gl.h>
 #include <GLFW/glfw3.h>

@@ -1,4 +1,4 @@
-#include "hopf/geometry/Primitives.h"
+#include "geometry/Primitives.h"
 
 #include "PrimitivesInternal.h"
 

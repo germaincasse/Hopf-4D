@@ -1,6 +1,6 @@
-#include "hopf/editor/panels/ConsolePanel.h"
+#include "editor/panels/ConsolePanel.h"
 
-#include "hopf/core/Logger.h"
+#include "core/Logger.h"
 
 #include <imgui.h>
 

@@ -47,7 +47,7 @@ set(HOPF_SOURCES
     src/platform/Window.cpp
 )
 
-file(GLOB_RECURSE HOPF_HEADERS CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/include/hopf/*.h")
+file(GLOB_RECURSE HOPF_HEADERS CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/include/*.h")
 
 add_executable(Hopf ${HOPF_SOURCES} ${HOPF_HEADERS})
 
@@ -63,7 +63,7 @@ target_link_libraries(Hopf PRIVATE
     opengl32
 )
 
-source_group(TREE "${CMAKE_SOURCE_DIR}/include/hopf" PREFIX "include" FILES ${HOPF_HEADERS})
+source_group(TREE "${CMAKE_SOURCE_DIR}/include"     PREFIX "include" FILES ${HOPF_HEADERS})
 source_group(TREE "${CMAKE_SOURCE_DIR}/src"          PREFIX "src"     FILES ${HOPF_SOURCES})
 
 set_target_properties(Hopf PROPERTIES

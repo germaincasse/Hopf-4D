@@ -1,6 +1,6 @@
-#include "hopf/editor/panels/InspectorPanel.h"
+#include "editor/panels/InspectorPanel.h"
 
-#include "hopf/scene/Scene.h"
+#include "scene/Scene.h"
 
 #include <imgui.h>
 

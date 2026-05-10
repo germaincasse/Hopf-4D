@@ -1,6 +1,6 @@
 #pragma once
 
-#include "hopf/math/Mat5.h"
+#include "math/Mat5.h"
 
 namespace hopf::math {
 

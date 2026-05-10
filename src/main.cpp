@@ -1,5 +1,5 @@
-#include "hopf/core/Application.h"
-#include "hopf/core/Logger.h"
+#include "core/Application.h"
+#include "core/Logger.h"
 
 #include <cstdio>
 #include <exception>

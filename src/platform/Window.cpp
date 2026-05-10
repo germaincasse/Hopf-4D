@@ -1,6 +1,6 @@
-#include "hopf/platform/Window.h"
+#include "platform/Window.h"
 
-#include "hopf/core/Logger.h"
+#include "core/Logger.h"
 
 #include <glad/gl.h>
 #include <GLFW/glfw3.h>

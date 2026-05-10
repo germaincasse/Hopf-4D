@@ -1,4 +1,4 @@
-#include "hopf/editor/panels/FilesPanel.h"
+#include "editor/panels/FilesPanel.h"
 
 #include <imgui.h>
 

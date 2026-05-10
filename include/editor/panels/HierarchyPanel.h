@@ -1,6 +1,6 @@
 #pragma once
 
-#include "hopf/editor/panels/Panel.h"
+#include "editor/panels/Panel.h"
 
 namespace hopf::editor {
 

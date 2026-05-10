@@ -1,8 +1,8 @@
 #pragma once
 
-#include "hopf/geometry/Mesh4D.h"
-#include "hopf/geometry/Primitives.h"
-#include "hopf/scene/Entity.h"
+#include "geometry/Mesh4D.h"
+#include "geometry/Primitives.h"
+#include "scene/Entity.h"
 
 #include <memory>
 #include <string>

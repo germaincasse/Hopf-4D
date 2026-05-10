@@ -1,7 +1,7 @@
 #pragma once
 
-#include "hopf/render/Camera4D.h"
-#include "hopf/render/Shader.h"
+#include "render/Camera4D.h"
+#include "render/Shader.h"
 
 #include <cstdint>
 

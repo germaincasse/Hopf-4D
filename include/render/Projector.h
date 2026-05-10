@@ -1,7 +1,7 @@
 #pragma once
 
-#include "hopf/geometry/Mesh4D.h"
-#include "hopf/math/Mat5.h"
+#include "geometry/Mesh4D.h"
+#include "math/Mat5.h"
 
 #include <cstdint>
 #include <vector>
