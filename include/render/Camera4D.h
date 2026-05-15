@@ -32,6 +32,7 @@ struct GridSettings {
     bool  showYW = false;
     bool  showZW = false;
     float opacity = 0.35f;
+    int   cells   = 10;    // grid extent: cells/2 lines on either side of the origin
 };
 
 struct Camera4D {
@@ -58,6 +59,8 @@ struct Camera4D {
     float fovYDeg  = 60.f;
     float zNear    = 0.05f;
     float zFar     = 200.f;
+
+    float bgR = 0.10f, bgG = 0.11f, bgB = 0.13f;
 };
 
 } // namespace hopf::render

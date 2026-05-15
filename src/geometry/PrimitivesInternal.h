@@ -15,12 +15,15 @@ Mesh4D buildCube3D(float size);
 Mesh4D buildTetrahedron3D(float size);
 Mesh4D buildOctahedron3D(float size);
 Mesh4D buildIcosahedron3D(float size);
+Mesh4D buildDodecahedron3D(float size);
+Mesh4D buildIcosphere3D(float size);
 Mesh4D buildSphere3D(float size);
 Mesh4D buildCylinder3D(float size);
 Mesh4D buildCone3D(float size);
 Mesh4D buildTorus3D(float size);
 Mesh4D buildPyramid3D(float size);
 Mesh4D buildPrism3D(float size);
+Mesh4D buildCapsule3D(float size);
 
 Mesh4D buildTesseract(float size);
 Mesh4D buildPentachoron(float size);

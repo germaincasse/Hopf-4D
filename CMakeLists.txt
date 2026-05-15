@@ -32,6 +32,8 @@ set(HOPF_SOURCES
 
     src/scene/Scene.cpp
 
+    src/physics/Physics.cpp
+
     src/render/Shader.cpp
     src/render/Slicer.cpp
     src/render/Projector.cpp
@@ -39,6 +41,7 @@ set(HOPF_SOURCES
 
     src/editor/Editor.cpp
     src/editor/panels/ViewportPanel.cpp
+    src/editor/panels/GameViewPanel.cpp
     src/editor/panels/HierarchyPanel.cpp
     src/editor/panels/InspectorPanel.cpp
     src/editor/panels/ConsolePanel.cpp

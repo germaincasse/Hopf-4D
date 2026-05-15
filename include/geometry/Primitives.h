@@ -18,12 +18,15 @@ enum class PrimitiveType {
     Tetrahedron3D,
     Octahedron3D,
     Icosahedron3D,
+    Dodecahedron3D,
+    Icosphere3D,
     Sphere3D,
     Cylinder3D,
     Cone3D,
     Torus3D,
     Pyramid3D,
     Prism3D,
+    Capsule3D,
 
     // 4D
     Tesseract,

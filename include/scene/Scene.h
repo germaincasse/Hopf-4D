@@ -21,6 +21,7 @@ public:
 
     Entity& addEntity(std::string name);
     Entity& addPrimitive(geometry::PrimitiveType type, float size = 1.f);
+    Entity& duplicateEntity(const Entity& src, std::string name);
     bool    removeEntity(EntityId id);
     void    moveEntityBefore(EntityId src, EntityId target);
 

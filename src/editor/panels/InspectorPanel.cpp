@@ -118,6 +118,7 @@ void InspectorPanel::render(EditorContext& ctx) {
             ImGui::DragFloat("Ortho size##c2d", &entity->camera2D->orthoSize, 0.05f, 0.1f, 100.f);
             ImGui::DragFloat("Near##c2d",       &entity->camera2D->zNear, 0.5f);
             ImGui::DragFloat("Far##c2d",        &entity->camera2D->zFar,  0.5f);
+            ImGui::ColorEdit3("Background##c2d", &entity->camera2D->bg.r);
             if (ImGui::Button("Remove##c2d")) entity->camera2D.reset();
         }
     }
@@ -131,6 +132,7 @@ void InspectorPanel::render(EditorContext& ctx) {
             }
             ImGui::DragFloat("Near##c3d", &entity->camera3D->zNear, 0.01f, 0.001f, 100.f);
             ImGui::DragFloat("Far##c3d",  &entity->camera3D->zFar,  1.0f,  1.f,    10000.f);
+            ImGui::ColorEdit3("Background##c3d", &entity->camera3D->bg.r);
             if (ImGui::Button("Remove##c3d")) entity->camera3D.reset();
         }
     }
@@ -152,6 +154,8 @@ void InspectorPanel::render(EditorContext& ctx) {
                 ImGui::Combo("Slice axis##c4d", &entity->camera4D->sliceAxis, axes, IM_ARRAYSIZE(axes));
                 ImGui::DragFloat("Slice value##c4d", &entity->camera4D->sliceVal, 0.01f, -2.f, 2.f);
             }
+            ImGui::Checkbox("Main camera (Game view)##c4d", &entity->camera4D->isMain);
+            ImGui::ColorEdit3("Background##c4d", &entity->camera4D->bg.r);
             if (ImGui::Button("Remove##c4d")) entity->camera4D.reset();
         }
     }
@@ -165,6 +169,61 @@ void InspectorPanel::render(EditorContext& ctx) {
         } else {
             ImGui::TextDisabled("(none)");
         }
+    }
+
+    if (entity->collider.has_value()) {
+        if (ImGui::CollapsingHeader("Mesh Collider", ImGuiTreeNodeFlags_DefaultOpen)) {
+            ImGui::Text("Dimension: %dD", entity->collider->dimension);
+            ImGui::Checkbox("Is Trigger##coll", &entity->collider->isTrigger);
+            if (ImGui::Button("Remove##coll")) entity->collider.reset();
+        }
+    }
+    if (entity->rigidbody.has_value()) {
+        if (ImGui::CollapsingHeader("Rigidbody", ImGuiTreeNodeFlags_DefaultOpen)) {
+            ImGui::Text("Dimension: %dD", entity->rigidbody->dimension);
+            ImGui::DragFloat("Mass##rb",     &entity->rigidbody->mass, 0.05f, 0.f, 1e6f);
+            ImGui::Checkbox("Kinematic##rb", &entity->rigidbody->kinematic);
+            ImGui::Checkbox("Use gravity##rb", &entity->rigidbody->useGravity);
+            ImGui::TextDisabled("Velocity");
+            dragVec4Axes("rb_vel", entity->rigidbody->velocity, 0.05f);
+            if (ImGui::Button("Remove##rb")) entity->rigidbody.reset();
+        }
+    }
+
+    ImGui::Separator();
+    const float wAvail = ImGui::GetContentRegionAvail().x;
+    if (ImGui::Button("Add Component", ImVec2(wAvail, 0))) {
+        ImGui::OpenPopup("##addComponentPopup");
+    }
+    if (ImGui::BeginPopup("##addComponentPopup")) {
+        const int dim = entity->mesh ? scene::meshDimension(*entity->mesh) : 4;
+        ImGui::TextDisabled("Detected dimension: %dD", dim);
+        ImGui::Separator();
+        if (!entity->collider.has_value()) {
+            if (ImGui::MenuItem("Mesh Collider")) {
+                scene::MeshColliderComponent c;
+                c.dimension = dim;
+                entity->collider = c;
+            }
+        }
+        if (!entity->rigidbody.has_value()) {
+            if (ImGui::MenuItem("Rigidbody")) {
+                scene::RigidbodyComponent rb;
+                rb.dimension = dim;
+                entity->rigidbody = rb;
+            }
+        }
+        if (!entity->light.has_value()) {
+            if (ImGui::MenuItem("Directional Light")) {
+                entity->light = scene::DirectionalLight{};
+            }
+        }
+        if (!entity->camera2D.has_value() && !entity->camera3D.has_value() && !entity->camera4D.has_value()) {
+            if (ImGui::MenuItem("Camera 2D")) entity->camera2D = scene::Camera2DComponent{};
+            if (ImGui::MenuItem("Camera 3D")) entity->camera3D = scene::Camera3DComponent{};
+            if (ImGui::MenuItem("Camera 4D")) entity->camera4D = scene::Camera4DComponent{};
+        }
+        ImGui::EndPopup();
     }
 
     ImGui::End();

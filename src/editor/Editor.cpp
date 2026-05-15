@@ -2,6 +2,7 @@
 
 #include "editor/panels/ConsolePanel.h"
 #include "editor/panels/FilesPanel.h"
+#include "editor/panels/GameViewPanel.h"
 #include "editor/panels/HierarchyPanel.h"
 #include "editor/panels/InspectorPanel.h"
 #include "editor/panels/ViewportPanel.h"
@@ -114,6 +115,7 @@ void Editor::init(GLFWwindow* window) {
     ImGui_ImplOpenGL3_Init("#version 460");
 
     m_panels.emplace_back(std::make_unique<ViewportPanel>(0));
+    m_panels.emplace_back(std::make_unique<GameViewPanel>());
     m_panels.emplace_back(std::make_unique<HierarchyPanel>());
     m_panels.emplace_back(std::make_unique<InspectorPanel>());
     m_panels.emplace_back(std::make_unique<ConsolePanel>());
@@ -153,6 +155,7 @@ void Editor::buildDefaultLayout(unsigned int dockspaceId) {
     ImGuiID bottom = ImGui::DockBuilderSplitNode(center, ImGuiDir_Down,  0.25f, nullptr, &center);
 
     ImGui::DockBuilderDockWindow("Viewport (4D)", center);
+    ImGui::DockBuilderDockWindow("Game",          center);
     ImGui::DockBuilderDockWindow("Hierarchy",     left);
     ImGui::DockBuilderDockWindow("Inspector",     right);
     ImGui::DockBuilderDockWindow("Console",       bottom);
@@ -197,6 +200,79 @@ void Editor::renderUI(scene::Scene& scene) {
             if (ImGui::MenuItem("Reset layout")) m_layoutBuilt = false;
             ImGui::EndMenu();
         }
+
+        // Play/Stop toggle + Pause, centered in the menu bar.
+        {
+            const float btnW       = ImGui::GetFrameHeight() * 1.4f;
+            const float spacing    = ImGui::GetStyle().ItemSpacing.x;
+            const float totalW     = btnW * 2.f + spacing;
+            const float available  = ImGui::GetContentRegionAvail().x;
+            const float offset     = std::max(0.f, (available - totalW) * 0.5f);
+            if (offset > 0.f) ImGui::Dummy(ImVec2(offset, 0.f));
+
+            auto drawIcon = [&](int kind, bool dim) {
+                const ImVec2 mn = ImGui::GetItemRectMin();
+                const ImVec2 mx = ImGui::GetItemRectMax();
+                const ImVec2 c { (mn.x + mx.x) * 0.5f, (mn.y + mx.y) * 0.5f };
+                const float r = (mx.y - mn.y) * 0.28f;
+                ImDrawList* dl = ImGui::GetWindowDrawList();
+                const int a = dim ? 110 : 255;
+                if (kind == 0) {
+                    const ImU32 col = IM_COL32(110, 220, 130, a);
+                    dl->AddTriangleFilled(ImVec2(c.x - r * 0.6f, c.y - r),
+                                          ImVec2(c.x - r * 0.6f, c.y + r),
+                                          ImVec2(c.x + r,        c.y),
+                                          col);
+                } else if (kind == 1) {
+                    const ImU32 col = IM_COL32(245, 200, 80, a);
+                    const float w2 = r * 0.35f;
+                    dl->AddRectFilled(ImVec2(c.x - r,         c.y - r),
+                                      ImVec2(c.x - r + w2,    c.y + r), col);
+                    dl->AddRectFilled(ImVec2(c.x + r - w2,    c.y - r),
+                                      ImVec2(c.x + r,         c.y + r), col);
+                } else {
+                    const ImU32 col = IM_COL32(230, 110, 110, a);
+                    dl->AddRectFilled(ImVec2(c.x - r, c.y - r), ImVec2(c.x + r, c.y + r), col);
+                }
+            };
+
+            const bool paused  = (m_ctx.playState == PlayState::Paused);
+            const bool stopped = (m_ctx.playState == PlayState::Stopped);
+            const bool running = !stopped;
+
+            if (running) ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
+            const bool clickedPlayStop = ImGui::Button("##playstop", ImVec2(btnW, 0));
+            if (running) ImGui::PopStyleColor();
+            drawIcon(running ? 2 : 0, false);
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
+                ImGui::SetTooltip("%s", running ? "Stop and reset the simulation" : "Play the simulation");
+            }
+            if (clickedPlayStop) {
+                if (stopped) {
+                    snapshotScene(scene);
+                    m_ctx.playState = PlayState::Playing;
+                } else {
+                    restoreScene(scene);
+                    m_ctx.playState = PlayState::Stopped;
+                }
+            }
+
+            ImGui::SameLine();
+
+            if (paused) ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
+            ImGui::BeginDisabled(stopped);
+            const bool clickedPause = ImGui::Button("##pause", ImVec2(btnW, 0));
+            ImGui::EndDisabled();
+            if (paused) ImGui::PopStyleColor();
+            drawIcon(1, stopped);
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
+                ImGui::SetTooltip("%s", paused ? "Resume" : "Pause");
+            }
+            if (clickedPause) {
+                m_ctx.playState = paused ? PlayState::Playing : PlayState::Paused;
+            }
+        }
+
         ImGui::EndMenuBar();
     }
 
@@ -213,6 +289,16 @@ void Editor::renderUI(scene::Scene& scene) {
     }
 
     processShortcuts();
+}
+
+void Editor::snapshotScene(scene::Scene& scene) {
+    m_sceneSnapshot = scene.entities();
+}
+
+void Editor::restoreScene(scene::Scene& scene) {
+    if (m_sceneSnapshot.empty()) return;
+    scene.entities() = m_sceneSnapshot;
+    m_sceneSnapshot.clear();
 }
 
 void Editor::applyUiScale() {
@@ -248,11 +334,7 @@ void Editor::processShortcuts() {
     }
     if (m_ctx.selected != 0 && ctrl && ImGui::IsKeyPressed(ImGuiKey_D, false)) {
         if (auto* src = m_ctx.scene->findEntity(m_ctx.selected)) {
-            auto& dup = m_ctx.scene->addEntity(src->name + " copy");
-            dup.transform  = src->transform;
-            dup.mesh       = src->mesh;
-            dup.visible    = src->visible;
-            dup.autoRotate = src->autoRotate;
+            auto& dup = m_ctx.scene->duplicateEntity(*src, src->name + " copy");
             m_ctx.selected = dup.id;
         }
     }
@@ -263,11 +345,7 @@ void Editor::processShortcuts() {
         }
     }
     if (ctrl && ImGui::IsKeyPressed(ImGuiKey_V, false) && m_ctx.clipboard.has_value()) {
-        auto& pasted = m_ctx.scene->addEntity(m_ctx.clipboard->name);
-        pasted.transform  = m_ctx.clipboard->transform;
-        pasted.mesh       = m_ctx.clipboard->mesh;
-        pasted.visible    = m_ctx.clipboard->visible;
-        pasted.autoRotate = m_ctx.clipboard->autoRotate;
+        auto& pasted = m_ctx.scene->duplicateEntity(*m_ctx.clipboard, m_ctx.clipboard->name);
         m_ctx.selected = pasted.id;
     }
 }

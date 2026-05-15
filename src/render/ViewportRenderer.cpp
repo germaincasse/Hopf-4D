@@ -127,7 +127,7 @@ void drawGrids(uint32_t vao, uint32_t vbo, uint32_t ebo, Shader& s,
                   || g.showXW || g.showYW || g.showZW;
     if (!any || g.opacity <= 0.f) return;
 
-    constexpr int   halfN = 5;
+    const int   halfN = std::max(1, g.cells / 2);
     constexpr float step  = 1.f;
     const float ext = float(halfN) * step;
 
@@ -312,7 +312,7 @@ void ViewportRenderer::render(const scene::Scene& scene, const Camera4D& camera)
 
     glBindFramebuffer(GL_FRAMEBUFFER, m_fbo);
     glViewport(0, 0, m_width, m_height);
-    glClearColor(0.10f, 0.11f, 0.13f, 1.f);
+    glClearColor(camera.bgR, camera.bgG, camera.bgB, 1.f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     glEnable(GL_DEPTH_TEST);
@@ -323,7 +323,11 @@ void ViewportRenderer::render(const scene::Scene& scene, const Camera4D& camera)
     glDisable(GL_CULL_FACE);
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
-    const math::Mat5 viewFromWorld = camera.rotation4.toInverseMatrix();
+    const math::Mat5 viewFromWorld = camera.rotation4.toInverseMatrix()
+                                   * math::translate4({-camera.position4.x,
+                                                       -camera.position4.y,
+                                                       -camera.position4.z,
+                                                       -camera.position4.w});
 
     m_lineShader.bind();
     m_lineShader.setMat4("uViewProj", VP.data());
@@ -491,7 +495,11 @@ scene::EntityId ViewportRenderer::pickEntityAt(const scene::Scene& scene,
                                       camera.pivotX, camera.pivotY, camera.pivotZ,
                                       0.f, upY, 0.f);
     const math::Mat4 VP = math::mat4Mul(P, V);
-    const math::Mat5 viewFromWorld = camera.rotation4.toInverseMatrix();
+    const math::Mat5 viewFromWorld = camera.rotation4.toInverseMatrix()
+                                   * math::translate4({-camera.position4.x,
+                                                       -camera.position4.y,
+                                                       -camera.position4.z,
+                                                       -camera.position4.w});
 
     const float ndcX = 2.f * (u / float(m_width)) - 1.f;
     const float ndcY = 1.f - 2.f * (v / float(m_height));
@@ -563,6 +571,58 @@ scene::EntityId ViewportRenderer::pickEntityAt(const scene::Scene& scene,
     }
 
     return bestId;
+}
+
+bool ViewportRenderer::worldToScreen(const Camera4D& camera, const math::Vec4& world,
+                                     float& outU, float& outV) const
+{
+    if (m_width <= 0 || m_height <= 0) return false;
+
+    const float yaw   = camera.yaw;
+    const float pitch = camera.pitch;
+    const float dist  = std::max(0.1f, camera.distance);
+    const float dirX = std::cos(pitch) * std::sin(yaw);
+    const float dirY = std::sin(pitch);
+    const float dirZ = std::cos(pitch) * std::cos(yaw);
+    const float ex = camera.pivotX + dist * dirX;
+    const float ey = camera.pivotY + dist * dirY;
+    const float ez = camera.pivotZ + dist * dirZ;
+    const float upY = std::cos(pitch) >= 0.f ? 1.f : -1.f;
+
+    const float aspect  = float(m_width) / float(m_height);
+    const float fovYRad = camera.fovYDeg * 3.14159265f / 180.f;
+    math::Mat4 P;
+    if (camera.projectionStyle == ProjectionStyle::Perspective) {
+        P = math::perspective(fovYRad, aspect, camera.zNear, camera.zFar);
+    } else {
+        const float halfH = std::max(0.05f, dist) * std::tan(fovYRad * 0.5f);
+        const float halfW = halfH * aspect;
+        P = math::ortho(-halfW, halfW, -halfH, halfH, camera.zNear, camera.zFar);
+    }
+    const math::Mat4 V = math::lookAt(ex, ey, ez,
+                                      camera.pivotX, camera.pivotY, camera.pivotZ,
+                                      0.f, upY, 0.f);
+    const math::Mat4 VP = math::mat4Mul(P, V);
+
+    const math::Mat5 viewFromWorld = camera.rotation4.toInverseMatrix()
+                                   * math::translate4({-camera.position4.x,
+                                                       -camera.position4.y,
+                                                       -camera.position4.z,
+                                                       -camera.position4.w});
+
+    const math::Vec4 vw = viewFromWorld.transformPoint(world);
+    const auto p3 = project4to3(vw, camera);
+
+    const float cx = VP[0]*p3[0] + VP[4]*p3[1] + VP[8] *p3[2] + VP[12];
+    const float cy = VP[1]*p3[0] + VP[5]*p3[1] + VP[9] *p3[2] + VP[13];
+    const float cw = VP[3]*p3[0] + VP[7]*p3[1] + VP[11]*p3[2] + VP[15];
+    if (cw <= 1e-4f) return false;
+
+    const float ndcX = cx / cw;
+    const float ndcY = cy / cw;
+    outU = (ndcX + 1.f) * 0.5f * float(m_width);
+    outV = (1.f - (ndcY + 1.f) * 0.5f) * float(m_height);
+    return true;
 }
 
 } // namespace hopf::render

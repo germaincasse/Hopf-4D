@@ -44,6 +44,11 @@ public:
     scene::EntityId pickEntityAt(const scene::Scene& scene, const Camera4D& camera,
                                  float u, float v) const;
 
+    // Projects a 4D world-space point to pixel coords inside the viewport image.
+    // Returns false if the point is behind the near plane or otherwise non-renderable.
+    bool worldToScreen(const Camera4D& camera, const math::Vec4& world,
+                       float& outU, float& outV) const;
+
 private:
     void ensureGpuResources();
     void destroyFramebuffer();

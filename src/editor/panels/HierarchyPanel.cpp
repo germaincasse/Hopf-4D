@@ -5,6 +5,9 @@
 
 #include <imgui.h>
 
+#include <algorithm>
+#include <cmath>
+
 namespace hopf::editor {
 
 namespace {
@@ -31,13 +34,16 @@ void renderAddObjectMenu(EditorContext& ctx) {
         if (ImGui::MenuItem("Cube"))        addPrimitive(ctx, geometry::PrimitiveType::Cube3D);
         if (ImGui::MenuItem("Tetrahedron")) addPrimitive(ctx, geometry::PrimitiveType::Tetrahedron3D);
         if (ImGui::MenuItem("Octahedron"))  addPrimitive(ctx, geometry::PrimitiveType::Octahedron3D);
-        if (ImGui::MenuItem("Icosahedron")) addPrimitive(ctx, geometry::PrimitiveType::Icosahedron3D);
-        if (ImGui::MenuItem("Sphere"))      addPrimitive(ctx, geometry::PrimitiveType::Sphere3D);
-        if (ImGui::MenuItem("Cylinder"))    addPrimitive(ctx, geometry::PrimitiveType::Cylinder3D);
-        if (ImGui::MenuItem("Cone"))        addPrimitive(ctx, geometry::PrimitiveType::Cone3D);
-        if (ImGui::MenuItem("Torus"))       addPrimitive(ctx, geometry::PrimitiveType::Torus3D);
-        if (ImGui::MenuItem("Pyramid"))     addPrimitive(ctx, geometry::PrimitiveType::Pyramid3D);
-        if (ImGui::MenuItem("Prism"))       addPrimitive(ctx, geometry::PrimitiveType::Prism3D);
+        if (ImGui::MenuItem("Icosahedron"))  addPrimitive(ctx, geometry::PrimitiveType::Icosahedron3D);
+        if (ImGui::MenuItem("Dodecahedron")) addPrimitive(ctx, geometry::PrimitiveType::Dodecahedron3D);
+        if (ImGui::MenuItem("Icosphere"))    addPrimitive(ctx, geometry::PrimitiveType::Icosphere3D);
+        if (ImGui::MenuItem("Sphere"))       addPrimitive(ctx, geometry::PrimitiveType::Sphere3D);
+        if (ImGui::MenuItem("Cylinder"))     addPrimitive(ctx, geometry::PrimitiveType::Cylinder3D);
+        if (ImGui::MenuItem("Cone"))         addPrimitive(ctx, geometry::PrimitiveType::Cone3D);
+        if (ImGui::MenuItem("Torus"))        addPrimitive(ctx, geometry::PrimitiveType::Torus3D);
+        if (ImGui::MenuItem("Pyramid"))      addPrimitive(ctx, geometry::PrimitiveType::Pyramid3D);
+        if (ImGui::MenuItem("Prism"))        addPrimitive(ctx, geometry::PrimitiveType::Prism3D);
+        if (ImGui::MenuItem("Capsule"))      addPrimitive(ctx, geometry::PrimitiveType::Capsule3D);
         ImGui::EndMenu();
     }
     if (ImGui::BeginMenu("Add Light")) {
@@ -85,6 +91,101 @@ void renderAddObjectMenu(EditorContext& ctx) {
     }
 }
 
+enum class IconKind { Dim2, Dim3, Dim4, Light, Camera, Unknown };
+
+IconKind classifyEntity(const scene::Entity& e) {
+    if (e.light.has_value()) return IconKind::Light;
+    if (e.camera2D.has_value() || e.camera3D.has_value() || e.camera4D.has_value())
+        return IconKind::Camera;
+    if (e.mesh) {
+        const int d = scene::meshDimension(*e.mesh);
+        if (d == 2) return IconKind::Dim2;
+        if (d == 3) return IconKind::Dim3;
+        return IconKind::Dim4;
+    }
+    return IconKind::Unknown;
+}
+
+void drawEntityIcon(ImDrawList* dl, ImVec2 min, ImVec2 max, IconKind kind) {
+    const float w = max.x - min.x;
+    const float h = max.y - min.y;
+    const ImVec2 c{min.x + w * 0.5f, min.y + h * 0.5f};
+
+    switch (kind) {
+        case IconKind::Dim2: {
+            // Orange triangle.
+            const ImU32 col = IM_COL32(255, 152, 80, 255);
+            const ImVec2 a{c.x,           min.y + h * 0.18f};
+            const ImVec2 b{min.x + w * 0.10f, max.y - h * 0.18f};
+            const ImVec2 cc{max.x - w * 0.10f, max.y - h * 0.18f};
+            dl->AddTriangleFilled(a, b, cc, col);
+            break;
+        }
+        case IconKind::Dim3: {
+            // Cyan cube outline.
+            const ImU32 col = IM_COL32(120, 200, 255, 255);
+            const ImVec2 p0{min.x + w * 0.18f, min.y + h * 0.28f};
+            const ImVec2 p1{max.x - w * 0.32f, min.y + h * 0.28f};
+            const ImVec2 p2{max.x - w * 0.32f, max.y - h * 0.18f};
+            const ImVec2 p3{min.x + w * 0.18f, max.y - h * 0.18f};
+            const ImVec2 q0{min.x + w * 0.32f, min.y + h * 0.18f};
+            const ImVec2 q1{max.x - w * 0.18f, min.y + h * 0.18f};
+            const ImVec2 q2{max.x - w * 0.18f, max.y - h * 0.28f};
+            dl->AddRect(p0, p2, col, 1.f, 0, 1.5f);
+            dl->AddLine(p0, q0, col, 1.5f);
+            dl->AddLine(p1, q1, col, 1.5f);
+            dl->AddLine(p2, q2, col, 1.5f);
+            dl->AddLine(q0, q1, col, 1.5f);
+            dl->AddLine(q1, q2, col, 1.5f);
+            break;
+        }
+        case IconKind::Dim4: {
+            // Magenta "tesseract" (square in square).
+            const ImU32 col = IM_COL32(220, 130, 220, 255);
+            const ImVec2 oMin{min.x + w * 0.12f, min.y + h * 0.12f};
+            const ImVec2 oMax{max.x - w * 0.12f, max.y - h * 0.12f};
+            const ImVec2 iMin{min.x + w * 0.32f, min.y + h * 0.32f};
+            const ImVec2 iMax{max.x - w * 0.32f, max.y - h * 0.32f};
+            dl->AddRect(oMin, oMax, col, 1.f, 0, 1.5f);
+            dl->AddRect(iMin, iMax, col, 1.f, 0, 1.5f);
+            dl->AddLine(oMin,                 iMin,                 col, 1.f);
+            dl->AddLine(ImVec2(oMax.x, oMin.y), ImVec2(iMax.x, iMin.y), col, 1.f);
+            dl->AddLine(oMax,                 iMax,                 col, 1.f);
+            dl->AddLine(ImVec2(oMin.x, oMax.y), ImVec2(iMin.x, iMax.y), col, 1.f);
+            break;
+        }
+        case IconKind::Light: {
+            // Yellow sun: filled circle + rays.
+            const ImU32 col = IM_COL32(255, 213, 80, 255);
+            const float r = std::min(w, h) * 0.22f;
+            dl->AddCircleFilled(c, r, col, 12);
+            const float R = std::min(w, h) * 0.42f;
+            for (int i = 0; i < 8; ++i) {
+                const float a = float(i) * 6.2831853f / 8.f;
+                const float cosA = std::cos(a), sinA = std::sin(a);
+                dl->AddLine(ImVec2(c.x + cosA * (r + 1.f),  c.y + sinA * (r + 1.f)),
+                            ImVec2(c.x + cosA * R,          c.y + sinA * R),
+                            col, 1.4f);
+            }
+            break;
+        }
+        case IconKind::Camera: {
+            // Light gray "camera body" rectangle + lens.
+            const ImU32 col = IM_COL32(190, 200, 210, 255);
+            const ImVec2 bMin{min.x + w * 0.15f, min.y + h * 0.30f};
+            const ImVec2 bMax{max.x - w * 0.35f, max.y - h * 0.25f};
+            dl->AddRectFilled(bMin, bMax, col, 1.5f);
+            dl->AddCircleFilled(ImVec2(max.x - w * 0.22f, c.y), std::min(w, h) * 0.18f, col, 12);
+            break;
+        }
+        case IconKind::Unknown: {
+            const ImU32 col = IM_COL32(140, 140, 150, 255);
+            dl->AddCircleFilled(c, std::min(w, h) * 0.15f, col, 10);
+            break;
+        }
+    }
+}
+
 } // namespace
 
 void HierarchyPanel::render(EditorContext& ctx) {
@@ -107,10 +208,18 @@ void HierarchyPanel::render(EditorContext& ctx) {
     scene::EntityId moveSrc = 0, moveTarget = 0;
 
     auto& entities = ctx.scene->entities();
+    const float iconSize = ImGui::GetTextLineHeight();
     for (size_t i = 0; i < entities.size(); ++i) {
         const auto& e   = entities[i];
         const bool sel  = (ctx.selected == e.id);
         ImGui::PushID(static_cast<int>(e.id));
+
+        const ImVec2 iconMin = ImGui::GetCursorScreenPos();
+        const ImVec2 iconMax{iconMin.x + iconSize, iconMin.y + iconSize};
+        drawEntityIcon(ImGui::GetWindowDrawList(), iconMin, iconMax, classifyEntity(e));
+        ImGui::Dummy(ImVec2(iconSize, iconSize));
+        ImGui::SameLine(0.f, ImGui::GetStyle().ItemInnerSpacing.x);
+
         if (ImGui::Selectable(e.name.c_str(), sel)) {
             ctx.selected = e.id;
         }
@@ -131,11 +240,7 @@ void HierarchyPanel::render(EditorContext& ctx) {
         if (ImGui::BeginPopupContextItem("##entityCtx")) {
             ctx.selected = e.id;
             if (ImGui::MenuItem("Duplicate", "Ctrl+D")) {
-                auto& dup = ctx.scene->addEntity(e.name + " copy");
-                dup.transform  = e.transform;
-                dup.mesh       = e.mesh;
-                dup.visible    = e.visible;
-                dup.autoRotate = e.autoRotate;
+                auto& dup = ctx.scene->duplicateEntity(e, e.name + " copy");
                 ctx.selected = dup.id;
             }
             if (ImGui::MenuItem("Copy", "Ctrl+C")) {
@@ -158,11 +263,7 @@ void HierarchyPanel::render(EditorContext& ctx) {
         if (ctx.clipboard.has_value()) {
             ImGui::Separator();
             if (ImGui::MenuItem("Paste", "Ctrl+V")) {
-                auto& pasted = ctx.scene->addEntity(ctx.clipboard->name);
-                pasted.transform  = ctx.clipboard->transform;
-                pasted.mesh       = ctx.clipboard->mesh;
-                pasted.visible    = ctx.clipboard->visible;
-                pasted.autoRotate = ctx.clipboard->autoRotate;
+                auto& pasted = ctx.scene->duplicateEntity(*ctx.clipboard, ctx.clipboard->name);
                 ctx.selected = pasted.id;
             }
         }

@@ -24,6 +24,14 @@ Entity& Scene::addPrimitive(geometry::PrimitiveType type, float size) {
     return e;
 }
 
+Entity& Scene::duplicateEntity(const Entity& src, std::string name) {
+    Entity copy = src;
+    copy.id   = m_nextId++;
+    copy.name = std::move(name);
+    m_entities.push_back(std::move(copy));
+    return m_entities.back();
+}
+
 bool Scene::removeEntity(EntityId id) {
     for (auto it = m_entities.begin(); it != m_entities.end(); ++it) {
         if (it->id == id) {

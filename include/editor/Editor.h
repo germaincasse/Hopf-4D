@@ -1,6 +1,7 @@
 #pragma once
 
 #include "editor/panels/Panel.h"
+#include "scene/Entity.h"
 
 #include <imgui.h>
 
@@ -28,16 +29,22 @@ public:
     void endFrame();
     void renderUI(scene::Scene& scene);
 
+    PlayState playState() const { return m_ctx.playState; }
+
 private:
     void buildDefaultLayout(unsigned int dockspaceId);
     void processShortcuts();
     void applyUiScale();
+
+    void snapshotScene(scene::Scene& scene);
+    void restoreScene(scene::Scene& scene);
 
     bool                                m_initialized = false;
     bool                                m_layoutBuilt = false;
     EditorContext                       m_ctx;
     std::vector<std::unique_ptr<Panel>> m_panels;
     int                                 m_nextViewportId = 1;
+    std::vector<scene::Entity>          m_sceneSnapshot;
 
     // Snapshot of the configured style at unit scale; ScaleAllSizes is multiplicative,
     // so we restart from this baseline whenever m_uiScale changes.

@@ -5,8 +5,10 @@
 
 #include <imgui.h>
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <vector>
 
 namespace hopf::editor {
 
@@ -212,6 +214,8 @@ void ViewportPanel::render(EditorContext& ctx) {
             planeRow("zw", m_camera.grid.showZW);
             ImGui::Separator();
             ImGui::SetNextItemWidth(160.f);
+            ImGui::SliderInt("Cells##grid", &m_camera.grid.cells, 2, 200);
+            ImGui::SetNextItemWidth(160.f);
             ImGui::SliderFloat("Opacity##grid", &m_camera.grid.opacity, 0.f, 1.f, "%.2f");
             ImGui::EndPopup();
         }
@@ -242,6 +246,50 @@ void ViewportPanel::render(EditorContext& ctx) {
                 const ImU32 col = ImGui::ColorConvertFloat4ToU32(axisVec[i]);
                 const ImVec2 pos(imgMin.x + labels[i].u + 5.f, imgMin.y + labels[i].v - 6.f);
                 dl->AddText(pos, col, axisChar[i]);
+            }
+        }
+
+        struct GizmoHit {
+            scene::EntityId id;
+            ImVec2          center;
+            float           radius;
+        };
+        std::vector<GizmoHit> gizmoHits;
+        if (ctx.scene) {
+            ImDrawList* dl = ImGui::GetWindowDrawList();
+            const float r = ImGui::GetFontSize() * 0.55f;
+            for (const auto& e : ctx.scene->entities()) {
+                const bool isLight  = e.light.has_value();
+                const bool isCamera = e.camera2D.has_value()
+                                   || e.camera3D.has_value()
+                                   || e.camera4D.has_value();
+                if (!isLight && !isCamera) continue;
+
+                float u = 0.f, v = 0.f;
+                if (!m_renderer.worldToScreen(m_camera, e.transform.position, u, v)) continue;
+                const ImVec2 c{imgMin.x + u, imgMin.y + v};
+                gizmoHits.push_back({e.id, c, r * 1.2f});
+
+                const bool sel = (ctx.selected == e.id);
+                if (isLight) {
+                    const ImU32 col = sel ? IM_COL32(255, 255, 200, 255)
+                                          : IM_COL32(255, 213, 80, 230);
+                    dl->AddCircleFilled(c, r * 0.45f, col, 14);
+                    for (int i = 0; i < 8; ++i) {
+                        const float a = float(i) * 6.2831853f / 8.f;
+                        const float ca = std::cos(a), sa = std::sin(a);
+                        dl->AddLine(ImVec2(c.x + ca * r * 0.55f, c.y + sa * r * 0.55f),
+                                    ImVec2(c.x + ca * r,         c.y + sa * r),
+                                    col, 1.6f);
+                    }
+                } else {
+                    const ImU32 col = sel ? IM_COL32(230, 240, 255, 255)
+                                          : IM_COL32(190, 200, 210, 230);
+                    dl->AddRectFilled(ImVec2(c.x - r * 0.7f, c.y - r * 0.55f),
+                                      ImVec2(c.x + r * 0.35f, c.y + r * 0.55f),
+                                      col, 2.f);
+                    dl->AddCircleFilled(ImVec2(c.x + r * 0.55f, c.y), r * 0.35f, col, 14);
+                }
             }
         }
 
@@ -293,9 +341,23 @@ void ViewportPanel::render(EditorContext& ctx) {
         if (m_clickPending && ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
             m_clickPending = false;
             if (hovered && ctx.scene) {
-                const float u = io.MousePos.x - imgMin.x;
-                const float v = io.MousePos.y - imgMin.y;
-                ctx.selected = m_renderer.pickEntityAt(*ctx.scene, m_camera, u, v);
+                // Gizmo hits take priority over mesh picking.
+                scene::EntityId gizmoId = 0;
+                for (const auto& g : gizmoHits) {
+                    const float dx = io.MousePos.x - g.center.x;
+                    const float dy = io.MousePos.y - g.center.y;
+                    if (dx * dx + dy * dy <= g.radius * g.radius) {
+                        gizmoId = g.id;
+                        break;
+                    }
+                }
+                if (gizmoId != 0) {
+                    ctx.selected = gizmoId;
+                } else {
+                    const float u = io.MousePos.x - imgMin.x;
+                    const float v = io.MousePos.y - imgMin.y;
+                    ctx.selected = m_renderer.pickEntityAt(*ctx.scene, m_camera, u, v);
+                }
             }
         }
     }

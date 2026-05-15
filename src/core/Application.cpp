@@ -2,6 +2,7 @@
 
 #include "core/Logger.h"
 #include "geometry/Primitives.h"
+#include "physics/Physics.h"
 
 #include <glad/gl.h>
 #include <GLFW/glfw3.h>
@@ -53,13 +54,8 @@ int Application::run() {
         const float  dt  = static_cast<float>(now - lastTime);
         lastTime = now;
 
-        for (auto& e : m_scene->entities()) {
-            e.transform.rotation.xy += e.autoRotate.xy * dt;
-            e.transform.rotation.xz += e.autoRotate.xz * dt;
-            e.transform.rotation.xw += e.autoRotate.xw * dt;
-            e.transform.rotation.yz += e.autoRotate.yz * dt;
-            e.transform.rotation.yw += e.autoRotate.yw * dt;
-            e.transform.rotation.zw += e.autoRotate.zw * dt;
+        if (m_editor->playState() == editor::PlayState::Playing) {
+            physics::step(*m_scene, dt);
         }
 
         int fbW = 0, fbH = 0;

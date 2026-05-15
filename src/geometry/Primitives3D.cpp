@@ -287,6 +287,172 @@ Mesh4D buildPyramid3D(float size) {
     return m;
 }
 
+Mesh4D buildIcosphere3D(float size) {
+    constexpr int subdivisions = 2;
+    Mesh4D m;
+    m.name = "Icosphere";
+    const float r = size * 0.5f;
+    const float t = (1.f + std::sqrt(5.f)) * 0.5f;
+    const float k0 = 1.f / std::sqrt(1.f + t * t);
+
+    struct V { float x, y, z; };
+    std::vector<V> verts = {
+        {-1,  t, 0}, { 1,  t, 0}, {-1, -t, 0}, { 1, -t, 0},
+        { 0, -1,  t}, { 0,  1,  t}, { 0, -1, -t}, { 0,  1, -t},
+        { t,  0, -1}, { t,  0,  1}, {-t,  0, -1}, {-t,  0,  1},
+    };
+    for (auto& v : verts) { v.x *= k0; v.y *= k0; v.z *= k0; }
+
+    std::vector<std::array<uint32_t, 3>> tris = {
+        { 0, 11,  5}, { 0,  5,  1}, { 0,  1,  7}, { 0,  7, 10}, { 0, 10, 11},
+        { 1,  5,  9}, { 5, 11,  4}, {11, 10,  2}, {10,  7,  6}, { 7,  1,  8},
+        { 3,  9,  4}, { 3,  4,  2}, { 3,  2,  6}, { 3,  6,  8}, { 3,  8,  9},
+        { 4,  9,  5}, { 2,  4, 11}, { 6,  2, 10}, { 8,  6,  7}, { 9,  8,  1},
+    };
+
+    auto midpoint = [&](uint32_t a, uint32_t b) {
+        V v = { (verts[a].x + verts[b].x) * 0.5f,
+                (verts[a].y + verts[b].y) * 0.5f,
+                (verts[a].z + verts[b].z) * 0.5f };
+        const float len = std::sqrt(v.x*v.x + v.y*v.y + v.z*v.z);
+        if (len > 0.f) { v.x /= len; v.y /= len; v.z /= len; }
+        verts.push_back(v);
+        return uint32_t(verts.size() - 1);
+    };
+
+    for (int s = 0; s < subdivisions; ++s) {
+        std::vector<std::array<uint32_t, 3>> next;
+        next.reserve(tris.size() * 4);
+        for (const auto& tri : tris) {
+            const uint32_t m01 = midpoint(tri[0], tri[1]);
+            const uint32_t m12 = midpoint(tri[1], tri[2]);
+            const uint32_t m20 = midpoint(tri[2], tri[0]);
+            next.push_back({tri[0], m01, m20});
+            next.push_back({tri[1], m12, m01});
+            next.push_back({tri[2], m20, m12});
+            next.push_back({m01, m12, m20});
+        }
+        tris = std::move(next);
+    }
+
+    m.vertices.reserve(verts.size());
+    for (const auto& v : verts) m.vertices.push_back({v.x * r, v.y * r, v.z * r, 0.f});
+
+    m.triangles.reserve(tris.size());
+    auto edgeKey = [](uint32_t a, uint32_t b) {
+        if (a > b) std::swap(a, b);
+        return (uint64_t(a) << 32) | uint64_t(b);
+    };
+    std::vector<uint64_t> seen;
+    seen.reserve(tris.size() * 3);
+    for (const auto& tri : tris) {
+        m.triangles.push_back({tri[0], tri[1], tri[2]});
+        for (int i = 0; i < 3; ++i) {
+            const uint64_t k = edgeKey(tri[i], tri[(i + 1) % 3]);
+            bool found = false;
+            for (auto e : seen) if (e == k) { found = true; break; }
+            if (!found) {
+                seen.push_back(k);
+                m.edges.push_back({uint32_t(k >> 32), uint32_t(k & 0xffffffff)});
+            }
+        }
+    }
+    return m;
+}
+
+Mesh4D buildDodecahedron3D(float size) {
+    Mesh4D m;
+    m.name = "Dodecahedron";
+    const float phi = (1.f + std::sqrt(5.f)) * 0.5f;
+    const float inv = 1.f / phi;
+    const float k   = (size * 0.5f) / std::sqrt(3.f);
+
+    auto add = [&](float x, float y, float z) {
+        m.vertices.push_back({k * x, k * y, k * z, 0.f});
+    };
+    for (int sx = 0; sx < 2; ++sx)
+        for (int sy = 0; sy < 2; ++sy)
+            for (int sz = 0; sz < 2; ++sz)
+                add(sx ? 1.f : -1.f, sy ? 1.f : -1.f, sz ? 1.f : -1.f);
+    for (int sy = 0; sy < 2; ++sy)
+        for (int sz = 0; sz < 2; ++sz) {
+            add(0.f,                 sy ?  inv : -inv, sz ?  phi : -phi);
+            add(sy ?  inv : -inv,    sz ?  phi : -phi, 0.f);
+            add(sy ?  phi : -phi,    0.f,              sz ?  inv : -inv);
+        }
+
+    // Edges via geometric distance — robust against vertex ordering pitfalls.
+    const float edgeLen = k * 2.f * inv;
+    const float eps     = 1e-3f * edgeLen;
+    for (uint32_t i = 0; i < m.vertices.size(); ++i) {
+        for (uint32_t j = i + 1; j < m.vertices.size(); ++j) {
+            const auto& a = m.vertices[i];
+            const auto& b = m.vertices[j];
+            const float dx = a.x - b.x, dy = a.y - b.y, dz = a.z - b.z;
+            if (std::abs(std::sqrt(dx*dx + dy*dy + dz*dz) - edgeLen) < eps) {
+                m.edges.push_back({i, j});
+            }
+        }
+    }
+    // Triangle list left empty: a robust pentagonal-face triangulation requires a
+    // hand-curated index table; we ship edges only for now (wireframe styles work fine).
+    return m;
+}
+
+Mesh4D buildCapsule3D(float size) {
+    constexpr int N = 16;
+    constexpr int latHemi = 6;
+    Mesh4D m;
+    m.name = "Capsule";
+    const float r = size * 0.25f;
+    const float cyl = size * 0.5f;
+
+    auto idx = [&](int row, int j) { return uint32_t(row * N + j); };
+
+    const int hemiRows = latHemi;
+    const int totalRows = hemiRows * 2 + 2; // top hemi + 2 cylinder rings + bottom hemi
+
+    auto pushRing = [&](float y, float ringR) {
+        for (int j = 0; j < N; ++j) {
+            const float a = 2.f * kPi * float(j) / float(N);
+            m.vertices.push_back({ringR * std::cos(a), y, ringR * std::sin(a), 0.f});
+        }
+    };
+
+    for (int i = 0; i < hemiRows; ++i) {
+        const float t = float(i) / float(hemiRows);
+        const float phi = kPi * 0.5f * (1.f - t);  // pi/2 down to 0
+        pushRing(cyl * 0.5f + r * std::sin(phi), r * std::cos(phi));
+    }
+    pushRing( cyl * 0.5f, r);
+    pushRing(-cyl * 0.5f, r);
+    for (int i = 0; i < hemiRows; ++i) {
+        const float t = float(i + 1) / float(hemiRows);
+        const float phi = -kPi * 0.5f * t;          // 0 down to -pi/2
+        pushRing(-cyl * 0.5f + r * std::sin(phi), r * std::cos(phi));
+    }
+    const uint32_t topPole    = uint32_t(m.vertices.size()); m.vertices.push_back({0.f,  cyl*0.5f + r, 0.f, 0.f});
+    const uint32_t bottomPole = uint32_t(m.vertices.size()); m.vertices.push_back({0.f, -cyl*0.5f - r, 0.f, 0.f});
+
+    for (int row = 0; row < totalRows - 1; ++row) {
+        for (int j = 0; j < N; ++j) {
+            const uint32_t a = idx(row,     j);
+            const uint32_t b = idx(row + 1, j);
+            const uint32_t c = idx(row + 1, (j + 1) % N);
+            const uint32_t d = idx(row,     (j + 1) % N);
+            m.triangles.push_back({a, b, c});
+            m.triangles.push_back({a, c, d});
+            m.edges.push_back({a, d});
+            if (row + 1 < totalRows - 1) m.edges.push_back({a, b});
+        }
+    }
+    for (int j = 0; j < N; ++j) {
+        m.triangles.push_back({topPole, idx(0, (j + 1) % N), idx(0, j)});
+        m.triangles.push_back({bottomPole, idx(totalRows - 1, j), idx(totalRows - 1, (j + 1) % N)});
+    }
+    return m;
+}
+
 Mesh4D buildPrism3D(float size) {
     Mesh4D m;
     m.name = "Prism";

@@ -267,17 +267,32 @@ Mesh4D buildTetrahedralPrism(float size) {
     return m;
 }
 
-// Extrude a 3D base mesh (vertices at w=0) along the W axis. The result is a 4D prism
-// bounded by 2 copies of the base plus lateral quads, tetrahedrized via fan from the
-// 4D centroid (origin).
+// Extrude a 3D base mesh (vertices at w=0) along the W axis. Produces a proper boundary
+// tetrahedrization of the resulting 4D prism so the slicer outputs the cross-section's
+// surface (not the filled interior).
+//
+//   Boundary cells of the 4D prism:
+//     - 1 bottom 3D solid (the base at w=-h): fan-tetrahedrized from a base-centroid anchor
+//     - 1 top    3D solid (the base at w=+h): same
+//     - One 3D triangular prism per base triangle: 3 tets via standard prism decomposition
 Mesh4D extrudeAlongW(const Mesh4D& base, float halfHeight, const char* name) {
     Mesh4D m;
     m.name = name;
     const uint32_t N = static_cast<uint32_t>(base.vertices.size());
 
-    m.vertices.reserve(N * 2 + 1);
+    m.vertices.reserve(N * 2 + 2);
     for (const auto& v : base.vertices) m.vertices.push_back({v.x, v.y, v.z, -halfHeight});
     for (const auto& v : base.vertices) m.vertices.push_back({v.x, v.y, v.z,  halfHeight});
+
+    float bcx = 0.f, bcy = 0.f, bcz = 0.f;
+    for (const auto& v : base.vertices) { bcx += v.x; bcy += v.y; bcz += v.z; }
+    const float bInv = N > 0 ? 1.f / float(N) : 0.f;
+    bcx *= bInv; bcy *= bInv; bcz *= bInv;
+
+    const uint32_t botCenter = static_cast<uint32_t>(m.vertices.size());
+    m.vertices.push_back({bcx, bcy, bcz, -halfHeight});
+    const uint32_t topCenter = static_cast<uint32_t>(m.vertices.size());
+    m.vertices.push_back({bcx, bcy, bcz,  halfHeight});
 
     for (const auto& e : base.edges) {
         m.edges.push_back({e[0], e[1]});
@@ -296,10 +311,21 @@ Mesh4D extrudeAlongW(const Mesh4D& base, float halfHeight, const char* name) {
         m.triangles.push_back({a, bt, at});
     }
 
-    const uint32_t centroid = static_cast<uint32_t>(m.vertices.size());
-    m.vertices.push_back({0, 0, 0, 0});
-    for (const auto& tri : m.triangles) {
-        m.tetrahedra.push_back({tri[0], tri[1], tri[2], centroid});
+    // Bottom cell: fan from bottom centroid.
+    for (const auto& t : base.triangles) {
+        m.tetrahedra.push_back({t[0], t[1], t[2], botCenter});
+    }
+    // Top cell: fan from top centroid.
+    for (const auto& t : base.triangles) {
+        m.tetrahedra.push_back({t[0] + N, t[1] + N, t[2] + N, topCenter});
+    }
+    // Lateral cells: one triangular prism per base triangle, 3 tets each.
+    for (const auto& t : base.triangles) {
+        const uint32_t a = t[0], b = t[1], c = t[2];
+        const uint32_t at = a + N, bt = b + N, ct = c + N;
+        m.tetrahedra.push_back({a, b, c, at});
+        m.tetrahedra.push_back({b, c, at, bt});
+        m.tetrahedra.push_back({c, at, bt, ct});
     }
     return m;
 }

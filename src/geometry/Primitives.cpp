@@ -17,12 +17,15 @@ const char* primitiveLabel(PrimitiveType type) {
         case PrimitiveType::Tetrahedron3D:    return "Tetrahedron";
         case PrimitiveType::Octahedron3D:     return "Octahedron";
         case PrimitiveType::Icosahedron3D:    return "Icosahedron";
+        case PrimitiveType::Dodecahedron3D:   return "Dodecahedron";
+        case PrimitiveType::Icosphere3D:      return "Icosphere";
         case PrimitiveType::Sphere3D:         return "Sphere";
         case PrimitiveType::Cylinder3D:       return "Cylinder";
         case PrimitiveType::Cone3D:           return "Cone";
         case PrimitiveType::Torus3D:          return "Torus";
         case PrimitiveType::Pyramid3D:        return "Pyramid";
         case PrimitiveType::Prism3D:          return "Prism";
+        case PrimitiveType::Capsule3D:        return "Capsule";
 
         case PrimitiveType::Tesseract:        return "Tesseract";
         case PrimitiveType::Pentachoron:      return "Pentachoron (5-cell)";
@@ -60,12 +63,15 @@ bool primitiveIs3D(PrimitiveType type) {
         case PrimitiveType::Tetrahedron3D:
         case PrimitiveType::Octahedron3D:
         case PrimitiveType::Icosahedron3D:
+        case PrimitiveType::Dodecahedron3D:
+        case PrimitiveType::Icosphere3D:
         case PrimitiveType::Sphere3D:
         case PrimitiveType::Cylinder3D:
         case PrimitiveType::Cone3D:
         case PrimitiveType::Torus3D:
         case PrimitiveType::Pyramid3D:
         case PrimitiveType::Prism3D:
+        case PrimitiveType::Capsule3D:
             return true;
         default:
             return false;
@@ -105,12 +111,15 @@ Mesh4D buildPrimitive(PrimitiveType type, float size) {
         case PrimitiveType::Tetrahedron3D:    return detail::buildTetrahedron3D(size);
         case PrimitiveType::Octahedron3D:     return detail::buildOctahedron3D(size);
         case PrimitiveType::Icosahedron3D:    return detail::buildIcosahedron3D(size);
+        case PrimitiveType::Dodecahedron3D:   return detail::buildDodecahedron3D(size);
+        case PrimitiveType::Icosphere3D:      return detail::buildIcosphere3D(size);
         case PrimitiveType::Sphere3D:         return detail::buildSphere3D(size);
         case PrimitiveType::Cylinder3D:       return detail::buildCylinder3D(size);
         case PrimitiveType::Cone3D:           return detail::buildCone3D(size);
         case PrimitiveType::Torus3D:          return detail::buildTorus3D(size);
         case PrimitiveType::Pyramid3D:        return detail::buildPyramid3D(size);
         case PrimitiveType::Prism3D:          return detail::buildPrism3D(size);
+        case PrimitiveType::Capsule3D:        return detail::buildCapsule3D(size);
 
         case PrimitiveType::Tesseract:        return detail::buildTesseract(size);
         case PrimitiveType::Pentachoron:      return detail::buildPentachoron(size);
