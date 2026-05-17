@@ -14,6 +14,8 @@ public:
     const char* name() const override { return "Files"; }
     void        render(EditorContext& ctx) override;
 
+    void setRoot(const std::string& path);
+
 private:
     void renderEntry(const std::filesystem::path& path, EditorContext& ctx);
 

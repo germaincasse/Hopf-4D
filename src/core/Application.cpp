@@ -5,11 +5,13 @@
 #include "geometry/Primitives.h"
 #include "physics/Physics.h"
 #include "scene/Scene.h"
+#include "scene/SceneSerializer.h"
 #include "scripting/Script.h"
 
 #include <glad/gl.h>
 #include <GLFW/glfw3.h>
 
+#include <filesystem>
 #include <vector>
 
 namespace hopf::core {
@@ -23,6 +25,11 @@ Application::Application() {
 
     m_window = std::make_unique<platform::Window>(desc);
     m_editor = std::make_unique<editor::Editor>();
+
+    std::error_code ecPre;
+    const auto projectDir = std::filesystem::current_path(ecPre) / "Project";
+    m_editor->setProjectRoot(projectDir.string());
+
     m_editor->init(m_window->native());
 
     m_audio = std::make_unique<audio::AudioEngine>();
@@ -31,6 +38,16 @@ Application::Application() {
     m_scene = std::make_unique<scene::Scene>();
     m_scene->setName("Untitled.hopf");
     buildDefaultScene();
+
+    // Make sure a tidy "Project" folder exists with just our default scene file,
+    // so the Files panel doesn't dump the entire repo on first launch.
+    std::error_code ec;
+    std::filesystem::create_directories(projectDir, ec);
+    const auto defaultScenePath = (projectDir / "Untitled.hopf").string();
+    if (!std::filesystem::exists(defaultScenePath, ec)) {
+        scene::saveScene(*m_scene, defaultScenePath);
+    }
+    m_projectDir = projectDir;
 
     Logger::info("Application initialized");
 }
@@ -55,6 +72,9 @@ void Application::buildDefaultScene() {
     sun.transform.rotation.yz = 0.5f;
 
     auto& cam = m_scene->addEntity("Main Camera");
+    // Place the camera a few units away from the origin (where the default cube
+    // sits) so it doesn't overlap the geometry it is meant to be looking at.
+    cam.transform.position = {0.f, 1.f, 5.f, 0.f};
     cam.camera4D = scene::Camera4DComponent{};
     cam.camera4D->isMain = true;
     cam.audioListener = scene::AudioListenerComponent{};

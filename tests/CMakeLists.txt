@@ -40,6 +40,7 @@ target_sources(hopf_tests PRIVATE
     "${CMAKE_SOURCE_DIR}/src/audio/AudioEngine.cpp"
     "${CMAKE_SOURCE_DIR}/src/ui/UIAnchor.cpp"
     "${CMAKE_SOURCE_DIR}/src/core/Logger.cpp"
+    "${CMAKE_SOURCE_DIR}/src/examples/CameraOrbit4D.cpp"
     "${CMAKE_SOURCE_DIR}/src/examples/Minesweeper4D.cpp"
 )
 

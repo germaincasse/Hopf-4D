@@ -33,6 +33,14 @@ void dispatchMouseWheel(scene::Scene& scene, float delta) {
     }
 }
 
+void dispatchMouseDragged(scene::Scene& scene, float dx, float dy, int button) {
+    for (auto& e : scene.entities()) {
+        for (auto& s : e.scripts) {
+            if (s.instance) s.instance->onMouseDragged(dx, dy, button);
+        }
+    }
+}
+
 } // namespace
 
 void GameViewPanel::render(EditorContext& ctx) {
@@ -107,6 +115,13 @@ void GameViewPanel::render(EditorContext& ctx) {
         // gameplay callbacks during Play mode.
         if (hovered && playing) {
             if (io.MouseWheel != 0.f) dispatchMouseWheel(*ctx.scene, io.MouseWheel);
+            for (int b = 0; b < 3; ++b) {
+                if (ImGui::IsMouseDragging(b)) {
+                    if (io.MouseDelta.x != 0.f || io.MouseDelta.y != 0.f) {
+                        dispatchMouseDragged(*ctx.scene, io.MouseDelta.x, io.MouseDelta.y, b);
+                    }
+                }
+            }
 
             auto handleClick = [&](int btn, bool& pending) {
                 if (ImGui::IsMouseClicked(btn)) { pending = true; }
@@ -128,6 +143,9 @@ void GameViewPanel::render(EditorContext& ctx) {
 
         ui::RenderOptions opts;
         opts.interactive = hovered && playing;
+        opts.worldToScreen = [this](const math::Vec4& w, float& sx, float& sy) {
+            return m_renderer.worldToScreen(m_camera, w, sx, sy);
+        };
         ui::render(*ctx.scene, imgMin.x, imgMin.y, imgSize.x, imgSize.y,
                    ImGui::GetWindowDrawList(), opts);
     }

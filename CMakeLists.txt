@@ -44,6 +44,7 @@ set(HOPF_SOURCES
     src/scripting/Script.cpp
     src/scripting/ScriptRegistry.cpp
 
+    src/examples/CameraOrbit4D.cpp
     src/examples/Minesweeper4D.cpp
 
     src/render/Shader.cpp

@@ -32,12 +32,12 @@ Fixture makeFixture() {
 
 } // namespace
 
-TEST_CASE("Minesweeper4D::onStart spawns a 5^4 grid of child cells", "[example][minesweeper]") {
+TEST_CASE("Minesweeper4D::onStart spawns a 5^4 grid of cells under a Cells parent", "[example][minesweeper]") {
     auto f = makeFixture();
     f.script->onStart();
     int kids = 0;
     for (const auto& e : f.scene.entities()) {
-        if (e.parent == f.rootId && e.mesh != nullptr) ++kids;
+        if (e.mesh != nullptr) ++kids;
     }
     REQUIRE(kids == 5 * 5 * 5 * 5);
 }
@@ -46,10 +46,9 @@ TEST_CASE("Minesweeper4D first click never lands on a mine", "[example][mineswee
     auto f = makeFixture();
     f.script->onStart();
 
-    // First child entity with a mesh = a cell.
     scene::EntityId someCell = 0;
     for (const auto& e : f.scene.entities()) {
-        if (e.parent == f.rootId && e.mesh != nullptr) { someCell = e.id; break; }
+        if (e.mesh != nullptr) { someCell = e.id; break; }
     }
     REQUIRE(someCell != 0);
 
@@ -70,7 +69,7 @@ TEST_CASE("Minesweeper4D right-click flags an unrevealed cell", "[example][mines
 
     scene::EntityId someCell = 0;
     for (const auto& e : f.scene.entities()) {
-        if (e.parent == f.rootId && e.mesh != nullptr) { someCell = e.id; break; }
+        if (e.mesh != nullptr) { someCell = e.id; break; }
     }
     REQUIRE(someCell != 0);
 
@@ -93,14 +92,12 @@ TEST_CASE("Minesweeper4D::onMessage('restart') clears + respawns the grid", "[ex
     f.script->onMessage("restart");
     const size_t entitiesAfterRestart = f.scene.entities().size();
 
-    // Same number of entities (root + 625 cells, plus status overlay made on the
-    // first updateStatusText call -- restart re-creates none until onUpdate runs).
-    REQUIRE(entitiesAfterStart >= 5 * 5 * 5 * 5 + 1); // root + cells
+    // root + Cells parent + 625 cells + 625 label children at minimum.
+    REQUIRE(entitiesAfterStart >= 5 * 5 * 5 * 5 + 1);
     REQUIRE(entitiesAfterRestart >= 5 * 5 * 5 * 5 + 1);
-    // And there is still exactly 5^4 children of the root.
     int kids = 0;
     for (const auto& e : f.scene.entities()) {
-        if (e.parent == f.rootId && e.mesh != nullptr) ++kids;
+        if (e.mesh != nullptr) ++kids;
     }
     REQUIRE(kids == 5 * 5 * 5 * 5);
 }

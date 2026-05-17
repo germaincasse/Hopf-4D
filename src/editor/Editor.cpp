@@ -122,7 +122,9 @@ void Editor::init(GLFWwindow* window) {
     m_panels.emplace_back(std::make_unique<HierarchyPanel>());
     m_panels.emplace_back(std::make_unique<InspectorPanel>());
     m_panels.emplace_back(std::make_unique<ConsolePanel>());
-    m_panels.emplace_back(std::make_unique<FilesPanel>());
+    auto files = std::make_unique<FilesPanel>();
+    if (!m_initialProjectRoot.empty()) files->setRoot(m_initialProjectRoot);
+    m_panels.emplace_back(std::move(files));
 
     m_initialized = true;
 }

@@ -15,24 +15,28 @@ void resolveAnchor(scene::UIAnchor anchor,
                    float& outMinX, float& outMinY,
                    float& outMaxX, float& outMaxY)
 {
-    float ax = 0.f, ay = 0.f;
+    // Anchor point on the canvas + pivot fraction on the rect itself. For TopLeft
+    // anchor the rect's top-left corner sits at anchor + (x, y); for Center, the
+    // rect's center; for BottomRight, the rect's bottom-right corner; and so on.
+    float ax = 0.f, ay = 0.f;        // anchor position in the canvas
+    float px = 0.f, py = 0.f;        // pivot on the rect (0 = min edge, 1 = max edge)
     switch (anchor) {
-        case scene::UIAnchor::TopLeft:      ax = 0.f;             ay = 0.f;             break;
-        case scene::UIAnchor::TopCenter:    ax = canvasSizeX*0.5f; ay = 0.f;            break;
-        case scene::UIAnchor::TopRight:     ax = canvasSizeX;     ay = 0.f;             break;
-        case scene::UIAnchor::MiddleLeft:   ax = 0.f;             ay = canvasSizeY*0.5f; break;
-        case scene::UIAnchor::Center:       ax = canvasSizeX*0.5f; ay = canvasSizeY*0.5f; break;
-        case scene::UIAnchor::MiddleRight:  ax = canvasSizeX;     ay = canvasSizeY*0.5f; break;
-        case scene::UIAnchor::BottomLeft:   ax = 0.f;             ay = canvasSizeY;     break;
-        case scene::UIAnchor::BottomCenter: ax = canvasSizeX*0.5f; ay = canvasSizeY;    break;
-        case scene::UIAnchor::BottomRight:  ax = canvasSizeX;     ay = canvasSizeY;     break;
+        case scene::UIAnchor::TopLeft:      ax = 0.f;             ay = 0.f;              px = 0.f; py = 0.f; break;
+        case scene::UIAnchor::TopCenter:    ax = canvasSizeX*0.5f; ay = 0.f;             px = 0.5f; py = 0.f; break;
+        case scene::UIAnchor::TopRight:     ax = canvasSizeX;     ay = 0.f;              px = 1.f; py = 0.f; break;
+        case scene::UIAnchor::MiddleLeft:   ax = 0.f;             ay = canvasSizeY*0.5f; px = 0.f; py = 0.5f; break;
+        case scene::UIAnchor::Center:       ax = canvasSizeX*0.5f; ay = canvasSizeY*0.5f; px = 0.5f; py = 0.5f; break;
+        case scene::UIAnchor::MiddleRight:  ax = canvasSizeX;     ay = canvasSizeY*0.5f; px = 1.f; py = 0.5f; break;
+        case scene::UIAnchor::BottomLeft:   ax = 0.f;             ay = canvasSizeY;      px = 0.f; py = 1.f; break;
+        case scene::UIAnchor::BottomCenter: ax = canvasSizeX*0.5f; ay = canvasSizeY;     px = 0.5f; py = 1.f; break;
+        case scene::UIAnchor::BottomRight:  ax = canvasSizeX;     ay = canvasSizeY;      px = 1.f; py = 1.f; break;
     }
-    const float cx = canvasMinX + ax + x;
-    const float cy = canvasMinY + ay + y;
-    outMinX = cx - width  * 0.5f;
-    outMinY = cy - height * 0.5f;
-    outMaxX = cx + width  * 0.5f;
-    outMaxY = cy + height * 0.5f;
+    const float pivotScreenX = canvasMinX + ax + x;
+    const float pivotScreenY = canvasMinY + ay + y;
+    outMinX = pivotScreenX - width  * px;
+    outMinY = pivotScreenY - height * py;
+    outMaxX = outMinX + width;
+    outMaxY = outMinY + height;
 }
 
 bool dispatchMessage(scene::Scene& scene,

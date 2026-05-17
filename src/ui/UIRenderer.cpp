@@ -9,22 +9,45 @@ namespace hopf::ui {
 
 namespace {
 
-inline void anchor(scene::UIAnchor a, float x, float y, float w, float h,
-                   float cmX, float cmY, float csX, float csY,
-                   ImVec2& outMin, ImVec2& outMax)
-{
-    float mnX, mnY, mxX, mxY;
-    resolveAnchor(a, x, y, w, h, cmX, cmY, csX, csY, mnX, mnY, mxX, mxY);
-    outMin = ImVec2(mnX, mnY);
-    outMax = ImVec2(mxX, mxY);
-}
-
 inline ImU32 packRGBA(float r, float g, float b, float a) {
     auto clamp01 = [](float x) { return x < 0.f ? 0.f : (x > 1.f ? 1.f : x); };
     return IM_COL32(int(clamp01(r) * 255.f),
                     int(clamp01(g) * 255.f),
                     int(clamp01(b) * 255.f),
                     int(clamp01(a) * 255.f));
+}
+
+// Resolves the screen rect for a UI element. If the element's UIRect has
+// worldSpace = true, the rect is centred on the entity's projected world
+// position; otherwise the anchor + offset path is used.
+inline bool layoutRect(const scene::Entity& e,
+                       const scene::Scene& scene,
+                       scene::UIAnchor anchor, float x, float y, float w, float h,
+                       float canvasMinX, float canvasMinY,
+                       float canvasSizeX, float canvasSizeY,
+                       const WorldToScreenFn& worldToScreen,
+                       ImVec2& outMin, ImVec2& outMax)
+{
+    const bool useWorld = e.uiRect.has_value() && e.uiRect->worldSpace && worldToScreen;
+    if (useWorld) {
+        const math::Vec4 wp = scene.worldMatrix(e.id).transformPoint({0.f, 0.f, 0.f, 0.f});
+        float sx = 0.f, sy = 0.f;
+        if (!worldToScreen(wp, sx, sy)) {
+            outMin = outMax = ImVec2(-1e6f, -1e6f); // off-screen
+            return false;
+        }
+        outMin = ImVec2(canvasMinX + sx - w * 0.5f + x,
+                        canvasMinY + sy - h * 0.5f + y);
+        outMax = ImVec2(outMin.x + w, outMin.y + h);
+        return true;
+    }
+    float mnX, mnY, mxX, mxY;
+    resolveAnchor(anchor, x, y, w, h,
+                  canvasMinX, canvasMinY, canvasSizeX, canvasSizeY,
+                  mnX, mnY, mxX, mxY);
+    outMin = ImVec2(mnX, mnY);
+    outMax = ImVec2(mxX, mxY);
+    return true;
 }
 
 } // namespace
@@ -46,8 +69,9 @@ void render(scene::Scene& scene,
         if (e.uiRect.has_value()) {
             const auto& r = *e.uiRect;
             ImVec2 mn, mx;
-            anchor(r.anchor, r.x, r.y, r.width, r.height,
-                   canvasMinX, canvasMinY, canvasSizeX, canvasSizeY, mn, mx);
+            if (!layoutRect(e, scene, r.anchor, r.x, r.y, r.width, r.height,
+                            canvasMinX, canvasMinY, canvasSizeX, canvasSizeY,
+                            opts.worldToScreen, mn, mx)) continue;
             dl->AddRectFilled(mn, mx, packRGBA(r.r, r.g, r.b, r.a), 4.f);
         }
         if (e.uiImage.has_value()) {
@@ -59,7 +83,9 @@ void render(scene::Scene& scene,
                 w = e.uiRect->width;  h = e.uiRect->height;
             }
             ImVec2 mn, mx;
-            anchor(a, x, y, w, h, canvasMinX, canvasMinY, canvasSizeX, canvasSizeY, mn, mx);
+            if (!layoutRect(e, scene, a, x, y, w, h,
+                            canvasMinX, canvasMinY, canvasSizeX, canvasSizeY,
+                            opts.worldToScreen, mn, mx)) continue;
             dl->AddRectFilled(mn, mx, packRGBA(im.r * 0.5f, im.g * 0.5f, im.b * 0.5f, im.a), 4.f);
             dl->AddRect(mn, mx, packRGBA(im.r, im.g, im.b, im.a), 4.f, 0, 2.f);
             dl->AddLine(mn, mx, packRGBA(im.r, im.g, im.b, im.a * 0.4f), 1.f);
@@ -79,7 +105,9 @@ void render(scene::Scene& scene,
             w = e.uiRect->width;  h = e.uiRect->height;
         }
         ImVec2 mn, mx;
-        anchor(a, x, y, w, h, canvasMinX, canvasMinY, canvasSizeX, canvasSizeY, mn, mx);
+        if (!layoutRect(e, scene, a, x, y, w, h,
+                        canvasMinX, canvasMinY, canvasSizeX, canvasSizeY,
+                        opts.worldToScreen, mn, mx)) continue;
         const bool hover = mouse.x >= mn.x && mouse.x <= mx.x
                         && mouse.y >= mn.y && mouse.y <= mx.y;
         const ImU32 fill = hover ? packRGBA(b.hoverR, b.hoverG, b.hoverB, b.hoverA)
@@ -87,7 +115,6 @@ void render(scene::Scene& scene,
         dl->AddRectFilled(mn, mx, fill, 6.f);
         dl->AddRect(mn, mx, IM_COL32(0, 0, 0, 180), 6.f, 0, 1.5f);
 
-        // Button label = co-located UIText if present, otherwise the entity name.
         const char* label = e.name.c_str();
         float       fontSize = 18.f;
         ImU32       textCol  = IM_COL32(255, 255, 255, 255);
@@ -107,8 +134,7 @@ void render(scene::Scene& scene,
         }
     }
 
-    // Pass 3: standalone text (drawn last so it sits above rects/images but below
-    // any button text that already drew). Buttons consume their co-located UIText.
+    // Pass 3: standalone text (above rects/images, below button text already drawn).
     for (const auto& e : scene.entities()) {
         if (!e.visible || !e.uiText.has_value() || e.uiButton.has_value()) continue;
         const auto& t = *e.uiText;
@@ -119,7 +145,9 @@ void render(scene::Scene& scene,
             w = e.uiRect->width;  h = e.uiRect->height;
         }
         ImVec2 mn, mx;
-        anchor(a, x, y, w, h, canvasMinX, canvasMinY, canvasSizeX, canvasSizeY, mn, mx);
+        if (!layoutRect(e, scene, a, x, y, w, h,
+                        canvasMinX, canvasMinY, canvasSizeX, canvasSizeY,
+                        opts.worldToScreen, mn, mx)) continue;
         ImFont* font = ImGui::GetFont();
         const ImVec2 size = font->CalcTextSizeA(t.fontSize, FLT_MAX, 0.f, t.text.c_str());
         const ImVec2 textPos((mn.x + mx.x - size.x) * 0.5f,

@@ -27,7 +27,8 @@ namespace {
 
 constexpr int   kGridSize  = 5;
 constexpr int   kCellCount = kGridSize * kGridSize * kGridSize * kGridSize;
-constexpr float kSpacing   = 2.5f;
+constexpr float kCellSize  = 1.0f;
+constexpr float kSpacing   = 0.8f;  // cells overlap when smaller than kCellSize
 constexpr int   kMineCount = 60;
 
 inline int indexOf(int x, int y, int z, int w) {
@@ -73,15 +74,8 @@ public:
         }
     }
 
-    void onMouseWheel(float delta) override {
-        auto* cam = mainCamera();
-        if (!cam) return;
-        const float current = cam->camera4D->sliceVal;
-        const float target  = std::round(current / kSpacing) * kSpacing
-                            + (delta > 0 ? kSpacing : -kSpacing);
-        const float bound   = kSpacing * (kGridSize - 1) * 0.5f;
-        cam->camera4D->sliceVal = std::clamp(target, -bound, bound);
-    }
+    // Wheel is handled by the CameraOrbit4D script that sits on the main camera
+    // entity; we don't override here so the same script controls all 4 example games.
 
     void onMessage(const std::string& method) override {
         if (method == "restart") {
@@ -100,6 +94,7 @@ private:
 
     struct Cell {
         hopf::scene::EntityId entity = 0;
+        hopf::scene::EntityId label  = 0; // child UI label entity
         int  count    = 0;
         bool isMine   = false;
         bool revealed = false;
@@ -113,14 +108,7 @@ private:
     Status m_status        = Status::NotStarted;
     std::mt19937 m_rng;
     hopf::scene::EntityId m_statusEntity = 0;
-
-    hopf::scene::Entity* mainCamera() {
-        if (!scene()) return nullptr;
-        for (auto& e : scene()->entities()) {
-            if (e.camera4D.has_value() && e.camera4D->isMain) return &e;
-        }
-        return nullptr;
-    }
+    hopf::scene::EntityId m_cellsParent  = 0;
 
     void spawnGrid() {
         if (!scene()) return;
@@ -134,9 +122,14 @@ private:
         const auto rootId = entityId();
         const float c = (kGridSize - 1) * 0.5f;
 
+        // Empty parent "Cells" so the 625 cell entities don't clutter the root of
+        // the hierarchy. They live as children of Cells, which lives under our root.
+        m_cellsParent = scene()->addEntity("Cells").id;
+        scene()->findEntity(m_cellsParent)->parent = rootId;
+
         // Build one tesseract mesh and share it across all 625 cells.
         const auto* sharedMesh = scene()->takeOwnedMesh(
-            hopf::geometry::buildPrimitive(hopf::geometry::PrimitiveType::Tesseract, 0.4f));
+            hopf::geometry::buildPrimitive(hopf::geometry::PrimitiveType::Tesseract, kCellSize));
 
         for (int x = 0; x < kGridSize; ++x)
         for (int y = 0; y < kGridSize; ++y)
@@ -144,7 +137,7 @@ private:
         for (int w = 0; w < kGridSize; ++w) {
             const int idx = indexOf(x, y, z, w);
             auto& cell = scene()->addEntity("Cell");
-            cell.parent = rootId;
+            cell.parent = m_cellsParent;
             cell.mesh   = sharedMesh;
             cell.primitiveType = "Tesseract";
             cell.transform.position = {
@@ -154,17 +147,39 @@ private:
                 (w - c) * kSpacing,
             };
             cell.tint = hopf::scene::ColorTint{0.55f, 0.55f, 0.6f}; // unrevealed gray
-            m_cells[idx].entity = cell.id;
-            m_cellByEntity[cell.id] = idx;
+            const auto cellId = cell.id;
+            m_cells[idx].entity = cellId;
+            m_cellByEntity[cellId] = idx;
+
+            // World-space UI label child: empty text until the cell is revealed.
+            auto& lbl = scene()->addEntity("Label");
+            lbl.parent  = cellId;
+            lbl.visible = false; // hidden until reveal
+            hopf::scene::UIRectComponent rect;
+            rect.worldSpace = true;
+            rect.width      = 36.f;
+            rect.height     = 24.f;
+            rect.r = 0.f; rect.g = 0.f; rect.b = 0.f; rect.a = 0.55f;
+            lbl.uiRect = rect;
+            hopf::scene::UITextComponent t;
+            t.text     = "";
+            t.fontSize = 16.f;
+            t.r = 1.f; t.g = 1.f; t.b = 1.f; t.a = 1.f;
+            lbl.uiText = t;
+            m_cells[idx].label = lbl.id;
         }
     }
 
     void despawnGrid() {
         if (!scene()) return;
         for (const auto& c : m_cells) {
+            if (c.label  != 0) scene()->removeEntity(c.label);
             if (c.entity != 0) scene()->removeEntity(c.entity);
         }
+        if (m_cellsParent  != 0) scene()->removeEntity(m_cellsParent);
         if (m_statusEntity != 0) scene()->removeEntity(m_statusEntity);
+        m_cellsParent  = 0;
+        m_statusEntity = 0;
         m_cellByEntity.clear();
     }
 
@@ -255,8 +270,9 @@ private:
     void applyRevealedTint(int idx) {
         const auto& c = m_cells[idx];
         if (c.count == 0) {
-            auto* e = scene()->findEntity(c.entity);
-            if (e) e->visible = false;
+            // Empty cell: hide the cube and its label so the cascade leaves visual gaps.
+            if (auto* e = scene()->findEntity(c.entity)) e->visible = false;
+            if (auto* l = scene()->findEntity(c.label))  l->visible = false;
             return;
         }
         // Color gradient over typical counts (1..20 in this 4D variant): blue->yellow->red.
@@ -265,6 +281,16 @@ private:
         const float g = std::min(1.f, std::max(0.f, 1.6f - t * 1.6f));
         const float b = std::min(1.f, std::max(0.f, 1.f - t * 2.f));
         tintEntity(c.entity, r, g, b);
+
+        // Display the neighbour count as a floating world-space label above the cube.
+        if (auto* l = scene()->findEntity(c.label)) {
+            l->visible = true;
+            if (l->uiText.has_value()) {
+                char buf[8];
+                std::snprintf(buf, sizeof(buf), "%d", c.count);
+                l->uiText->text = buf;
+            }
+        }
     }
 
     void toggleFlag(int idx) {
@@ -311,7 +337,7 @@ private:
         }
         char buf[256];
         std::snprintf(buf, sizeof(buf),
-                      "%s   |   flags %d/%d   |   revealed %d/%d   |   wheel = next slice",
+                      "%s   |   flags %d/%d   |   revealed %d/%d   |   right-drag = orbit, wheel = dolly",
                       st, m_flaggedCount, kMineCount,
                       m_revealedCount, kCellCount - kMineCount);
         e->uiText->text = buf;

@@ -116,7 +116,8 @@ bool saveScene(const Scene& scene, const std::string& path) {
             const auto& u = *e.uiRect;
             out << "  uiRect " << static_cast<int>(u.anchor) << ' '
                 << u.x << ' ' << u.y << ' ' << u.width << ' ' << u.height << ' '
-                << u.r << ' ' << u.g << ' ' << u.b << ' ' << u.a << '\n';
+                << u.r << ' ' << u.g << ' ' << u.b << ' ' << u.a
+                << ' ' << (u.worldSpace ? 1 : 0) << '\n';
         }
         if (e.uiText) {
             const auto& u = *e.uiText;
@@ -288,9 +289,11 @@ bool loadScene(Scene& scene, const std::string& path) {
         else if (tok == "uiRect") {
             UIRectComponent u;
             int anchor;
+            int worldSpace = 0;
             ls >> anchor >> u.x >> u.y >> u.width >> u.height
-               >> u.r >> u.g >> u.b >> u.a;
-            u.anchor = static_cast<UIAnchor>(anchor);
+               >> u.r >> u.g >> u.b >> u.a >> worldSpace;
+            u.anchor     = static_cast<UIAnchor>(anchor);
+            u.worldSpace = (worldSpace != 0);
             pending.uiRect = u;
         }
         else if (tok == "uiText") {

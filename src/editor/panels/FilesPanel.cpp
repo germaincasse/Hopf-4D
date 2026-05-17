@@ -55,6 +55,11 @@ FilesPanel::FilesPanel() {
     m_rootBuf = m_root.string();
 }
 
+void FilesPanel::setRoot(const std::string& path) {
+    m_rootBuf = path;
+    m_root    = std::filesystem::path(path);
+}
+
 void FilesPanel::render(EditorContext& ctx) {
     if (!m_open) return;
     if (!ImGui::Begin(name(), &m_open)) {

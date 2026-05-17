@@ -41,6 +41,11 @@ public:
     // Fired in Play mode when the mouse wheel scrolls inside the Game view.
     virtual void onMouseWheel(float /*delta*/) {}
 
+    // Fired in Play mode each frame the mouse is being dragged inside the Game
+    // view. `button` is 0 for left, 1 for right, 2 for middle. `dx`/`dy` are the
+    // pixel delta since the previous frame.
+    virtual void onMouseDragged(float /*dx*/, float /*dy*/, int /*button*/) {}
+
     // Owning entity / scene. Re-resolved each call so the pointer stays valid even
     // when other scripts spawn or remove entities (which would invalidate a stored
     // Entity*). Returns nullptr if the owning entity has been destroyed.

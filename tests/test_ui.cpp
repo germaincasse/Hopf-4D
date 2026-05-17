@@ -28,21 +28,20 @@ int         TestButtonReceiver::count = 0;
 
 HOPF_REGISTER_SCRIPT(TestButtonReceiver)
 
-TEST_CASE("resolveAnchor: TopLeft places rect at canvas origin + offset", "[ui][anchor]") {
+TEST_CASE("resolveAnchor: TopLeft puts the rect's TOP-LEFT corner at anchor + offset", "[ui][anchor]") {
     float mnX, mnY, mxX, mxY;
     ui::resolveAnchor(scene::UIAnchor::TopLeft,
                       /*x*/ 50.f, /*y*/ 20.f, /*w*/ 200.f, /*h*/ 100.f,
                       /*cmX*/ 10.f, /*cmY*/ 5.f,
                       /*csX*/ 1920.f, /*csY*/ 1080.f,
                       mnX, mnY, mxX, mxY);
-    // Center sits at canvasMin + offset; rect extends half-size around it.
-    REQUIRE(mnX == Approx(10.f + 50.f - 100.f));
-    REQUIRE(mnY == Approx(5.f  + 20.f - 50.f));
-    REQUIRE(mxX == Approx(10.f + 50.f + 100.f));
-    REQUIRE(mxY == Approx(5.f  + 20.f + 50.f));
+    REQUIRE(mnX == Approx(10.f + 50.f));
+    REQUIRE(mnY == Approx(5.f  + 20.f));
+    REQUIRE(mxX == Approx(mnX + 200.f));
+    REQUIRE(mxY == Approx(mnY + 100.f));
 }
 
-TEST_CASE("resolveAnchor: Center places rect at canvas center", "[ui][anchor]") {
+TEST_CASE("resolveAnchor: Center puts the rect's CENTER at canvas center + offset", "[ui][anchor]") {
     float mnX, mnY, mxX, mxY;
     ui::resolveAnchor(scene::UIAnchor::Center,
                       0.f, 0.f, 100.f, 40.f,
@@ -54,14 +53,16 @@ TEST_CASE("resolveAnchor: Center places rect at canvas center", "[ui][anchor]") 
     REQUIRE(mxY == Approx(320.f));
 }
 
-TEST_CASE("resolveAnchor: BottomRight places rect at canvas bottom-right corner", "[ui][anchor]") {
+TEST_CASE("resolveAnchor: BottomRight puts the rect's BOTTOM-RIGHT corner at the canvas BR + offset", "[ui][anchor]") {
     float mnX, mnY, mxX, mxY;
     ui::resolveAnchor(scene::UIAnchor::BottomRight,
                       -50.f, -20.f, 100.f, 40.f,
                       0.f, 0.f, 800.f, 600.f,
                       mnX, mnY, mxX, mxY);
-    REQUIRE(mxX == Approx(800.f - 50.f + 50.f));
-    REQUIRE(mxY == Approx(600.f - 20.f + 20.f));
+    REQUIRE(mxX == Approx(800.f - 50.f));
+    REQUIRE(mxY == Approx(600.f - 20.f));
+    REQUIRE(mnX == Approx(mxX - 100.f));
+    REQUIRE(mnY == Approx(mxY - 40.f));
 }
 
 TEST_CASE("dispatchMessage delivers to the first script of the named type", "[ui][dispatch]") {

@@ -287,6 +287,7 @@ void InspectorPanel::render(EditorContext& ctx) {
             ImGui::DragFloat("Width##uir",  &r.width,  1.f, 1.f, 4096.f);
             ImGui::DragFloat("Height##uir", &r.height, 1.f, 1.f, 4096.f);
             ImGui::ColorEdit4("Color##uir", &r.r);
+            ImGui::Checkbox("World-space (follow entity)##uir", &r.worldSpace);
             if (ImGui::Button("Remove##uir")) entity->uiRect.reset();
         }
     }

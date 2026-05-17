@@ -178,12 +178,13 @@ void renderAddObjectMenu(EditorContext& ctx) {
     }
 }
 
-enum class IconKind { Dim2, Dim3, Dim4, Light, Camera, UI, Empty, Unknown };
+enum class IconKind { Dim2, Dim3, Dim4, Light, Camera2D, Camera3D, Camera4D, UI, Empty, Unknown };
 
 IconKind classifyEntity(const scene::Entity& e) {
     if (e.light.has_value()) return IconKind::Light;
-    if (e.camera2D.has_value() || e.camera3D.has_value() || e.camera4D.has_value())
-        return IconKind::Camera;
+    if (e.camera4D.has_value()) return IconKind::Camera4D;
+    if (e.camera3D.has_value()) return IconKind::Camera3D;
+    if (e.camera2D.has_value()) return IconKind::Camera2D;
     if (e.mesh) {
         const int d = scene::meshDimension(*e.mesh);
         if (d == 2) return IconKind::Dim2;
@@ -258,9 +259,15 @@ void drawEntityIcon(ImDrawList* dl, ImVec2 min, ImVec2 max, IconKind kind) {
             }
             break;
         }
-        case IconKind::Camera: {
-            // Light gray "camera body" rectangle + lens.
-            const ImU32 col = IM_COL32(190, 200, 210, 255);
+        case IconKind::Camera2D:
+        case IconKind::Camera3D:
+        case IconKind::Camera4D: {
+            // Camera body + lens, tinted with the same color used by the matching
+            // dimension primitives icon (orange / cyan / magenta).
+            ImU32 col = IM_COL32(190, 200, 210, 255);
+            if (kind == IconKind::Camera2D) col = IM_COL32(255, 152,  80, 255); // orange (Dim2)
+            if (kind == IconKind::Camera3D) col = IM_COL32(120, 200, 255, 255); // cyan   (Dim3)
+            if (kind == IconKind::Camera4D) col = IM_COL32(220, 130, 220, 255); // magenta(Dim4)
             const ImVec2 bMin{min.x + w * 0.15f, min.y + h * 0.30f};
             const ImVec2 bMax{max.x - w * 0.35f, max.y - h * 0.25f};
             dl->AddRectFilled(bMin, bMax, col, 1.5f);

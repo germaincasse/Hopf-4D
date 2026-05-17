@@ -136,6 +136,10 @@ struct UIRectComponent {
     float    x = 0.f, y = 0.f;            // pixel offset from anchor
     float    width = 200.f, height = 80.f;
     float    r = 0.2f, g = 0.2f, b = 0.25f, a = 1.f;
+    // When true, the anchor is ignored and the rect's CENTER is placed at the
+    // entity's world position projected through the main camera (useful for HUD
+    // labels that follow a 3D/4D entity, like a health bar over a mob).
+    bool     worldSpace = false;
 };
 
 struct UITextComponent {

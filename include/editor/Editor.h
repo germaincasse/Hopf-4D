@@ -25,6 +25,10 @@ public:
     void init(GLFWwindow* window);
     void shutdown();
 
+    // Optional initial root for the Files panel. Call before init() ideally, or
+    // before the first frame to take effect on the first display.
+    void setProjectRoot(const std::string& path) { m_initialProjectRoot = path; }
+
     void beginFrame();
     void endFrame();
     void renderUI(scene::Scene& scene);
@@ -53,6 +57,8 @@ private:
     // so we restart from this baseline whenever m_uiScale changes.
     ImGuiStyle                          m_baseStyle{};
     float                               m_uiScale = 1.f;
+
+    std::string                         m_initialProjectRoot;
 };
 
 } // namespace hopf::editor

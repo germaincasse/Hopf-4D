@@ -7,8 +7,10 @@
 // The renderer reads the scene mutably because click dispatch can invoke scripts
 // that mutate it. Pure data components (rect/text/image) are read-only.
 
+#include "math/Vec4.h"
 #include "scene/Entity.h"
 
+#include <functional>
 #include <string>
 
 struct ImDrawList; // forward declare to keep imgui out of the public header.
@@ -16,6 +18,10 @@ struct ImDrawList; // forward declare to keep imgui out of the public header.
 namespace hopf::scene { class Scene; }
 
 namespace hopf::ui {
+
+// Projects a 4D world point to canvas-local screen pixels. Returns false if the
+// point is behind the camera. Used for world-space UI labels.
+using WorldToScreenFn = std::function<bool(const math::Vec4&, float& outX, float& outY)>;
 
 // Resolves an anchored rectangle into screen-space top-left + bottom-right pixels.
 // canvasMin* and canvasSize* are the Game view image rect in screen coords.
@@ -38,6 +44,9 @@ struct RenderOptions {
     // If true, button click hit-tests fire dispatch. The editor passes true only
     // while in Play mode; in Stopped/Paused the UI draws but stays inert.
     bool interactive = false;
+    // Optional. When set, UI entities with `worldSpace = true` on their UIRect
+    // anchor themselves at their world-projected position via this callback.
+    WorldToScreenFn worldToScreen{};
 };
 
 void render(scene::Scene& scene,
