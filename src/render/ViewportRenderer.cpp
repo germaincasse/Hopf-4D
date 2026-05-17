@@ -19,23 +19,21 @@ namespace {
 
 // 4D -> 3D projection consistent with how meshes are rendered. In Projection mode
 // the result is (x, y, z) (optionally w-perspective-scaled). In Slice mode the result
-// is the three components other than the slice axis, in axis order.
+// is the point's coordinates inside the slice hyperplane's orthonormal basis.
 std::array<float, 3> project4to3(const math::Vec4& v, const Camera4D& camera) {
     if (camera.mode == ViewMode::Projection) {
-        if (camera.projectionStyle == ProjectionStyle::Perspective) {
+        if (perspective4D(camera.projectionStyle)) {
             const float wp = v.w + camera.wOffset;
             const float k  = wp != 0.f ? camera.focal4 / wp : 1.f;
             return { v.x * k, v.y * k, v.z * k };
         }
         return { v.x, v.y, v.z };
     }
-    const int axis = static_cast<int>(camera.sliceAxis);
-    std::array<float, 3> out{};
-    int oi = 0;
-    for (int i = 0; i < 4; ++i) {
-        if (i != axis) out[oi++] = v[i];
-    }
-    return out;
+    const auto n = normalizeSliceNormal(camera.sliceAxis);
+    const auto b = buildSliceBasis(n);
+    float x, y, z;
+    projectOntoSliceBasis(v, b, x, y, z);
+    return { x, y, z };
 }
 
 // Like project4to3 but for a direction vector: no perspective scaling. Used to bring
@@ -44,13 +42,11 @@ std::array<float, 3> projectDir4to3(const math::Vec4& d, const Camera4D& camera)
     if (camera.mode == ViewMode::Projection) {
         return { d.x, d.y, d.z };
     }
-    const int axis = static_cast<int>(camera.sliceAxis);
-    std::array<float, 3> out{};
-    int oi = 0;
-    for (int i = 0; i < 4; ++i) {
-        if (i != axis) out[oi++] = d[i];
-    }
-    return out;
+    const auto n = normalizeSliceNormal(camera.sliceAxis);
+    const auto b = buildSliceBasis(n);
+    float x, y, z;
+    projectOntoSliceBasis(d, b, x, y, z);
+    return { x, y, z };
 }
 
 void drawWorldAxes(uint32_t vao, uint32_t vbo, uint32_t ebo, Shader& s,
@@ -70,11 +66,16 @@ void drawWorldAxes(uint32_t vao, uint32_t vbo, uint32_t ebo, Shader& s,
         {1.0f, 0.85f, 0.20f},
     };
 
-    // In Slice mode the axis perpendicular to the hyperplane collapses to a point;
-    // skip drawing it. In Projection mode all 4 axes are drawn.
-    const int hideAxis = (camera.mode == ViewMode::Slice)
-                       ? static_cast<int>(camera.sliceAxis)
-                       : -1;
+    // In Slice mode the axis most aligned with the slicing normal mostly collapses
+    // to a point; skip drawing it. In Projection mode all 4 axes are drawn.
+    int hideAxis = -1;
+    if (camera.mode == ViewMode::Slice) {
+        const auto n = normalizeSliceNormal(camera.sliceAxis);
+        float best = std::abs(n.x); hideAxis = 0;
+        if (std::abs(n.y) > best) { best = std::abs(n.y); hideAxis = 1; }
+        if (std::abs(n.z) > best) { best = std::abs(n.z); hideAxis = 2; }
+        if (std::abs(n.w) > best) { best = std::abs(n.w); hideAxis = 3; }
+    }
 
     const math::Vec4 originView = viewFromWorld.transformPoint({0, 0, 0, 0});
     const auto       originProj = project4to3(originView, camera);
@@ -296,7 +297,7 @@ void ViewportRenderer::render(const scene::Scene& scene, const Camera4D& camera)
     const float aspect  = float(m_width) / float(m_height);
     const float fovYRad = camera.fovYDeg * 3.14159265f / 180.f;
     math::Mat4 P;
-    if (camera.projectionStyle == ProjectionStyle::Perspective) {
+    if (perspective3D(camera.projectionStyle)) {
         P = math::perspective(fovYRad, aspect, camera.zNear, camera.zFar);
     } else {
         // Match the perspective view's apparent size at the pivot: the visible vertical
@@ -332,19 +333,27 @@ void ViewportRenderer::render(const scene::Scene& scene, const Camera4D& camera)
     m_lineShader.bind();
     m_lineShader.setMat4("uViewProj", VP.data());
     drawGrids(m_lineVao, m_lineVbo, m_lineEbo, m_lineShader, viewFromWorld, camera);
-    drawWorldAxes(m_lineVao, m_lineVbo, m_lineEbo, m_lineShader, viewFromWorld, camera);
+    if (camera.showWorldAxes) {
+        drawWorldAxes(m_lineVao, m_lineVbo, m_lineEbo, m_lineShader, viewFromWorld, camera);
+    }
 
     {
         const float L = 1.f;
         const math::Vec4 axisLocal[4] = {
             {L, 0, 0, 0}, {0, L, 0, 0}, {0, 0, L, 0}, {0, 0, 0, L},
         };
-        const int hideAxis = (camera.mode == ViewMode::Slice)
-                           ? static_cast<int>(camera.sliceAxis)
-                           : -1;
+        int hideAxis = -1;
+        if (camera.mode == ViewMode::Slice) {
+            const auto n = normalizeSliceNormal(camera.sliceAxis);
+            float best = std::abs(n.x); hideAxis = 0;
+            if (std::abs(n.y) > best) { best = std::abs(n.y); hideAxis = 1; }
+            if (std::abs(n.z) > best) { best = std::abs(n.z); hideAxis = 2; }
+            if (std::abs(n.w) > best) { best = std::abs(n.w); hideAxis = 3; }
+        }
+        const bool axesOn = camera.showWorldAxes;
         for (int i = 0; i < 4; ++i) {
             m_axisLabels[i].visible = false;
-            if (i == hideAxis) continue;
+            if (!axesOn || i == hideAxis) continue;
 
             const math::Vec4 vw = viewFromWorld.transformPoint(axisLocal[i]);
             const auto p3 = project4to3(vw, camera);
@@ -406,11 +415,11 @@ void ViewportRenderer::render(const scene::Scene& scene, const Camera4D& camera)
 
     for (const auto& e : scene.entities()) {
         if (!e.visible || !e.mesh) continue;
-        const math::Mat5 viewFromLocal = viewFromWorld * e.transform.toMatrix();
+        const math::Mat5 viewFromLocal = viewFromWorld * scene.worldMatrix(e.id);
 
         if (camera.mode == ViewMode::Slice) {
             const SliceMesh sm = sliceMesh(*e.mesh, viewFromLocal,
-                                           static_cast<int>(camera.sliceAxis),
+                                           camera.sliceAxis,
                                            camera.sliceVal);
             if (sm.triVertices.empty()) continue;
 
@@ -422,16 +431,20 @@ void ViewportRenderer::render(const scene::Scene& scene, const Camera4D& camera)
 
             glPolygonMode(GL_FRONT_AND_BACK, isSolid ? GL_FILL : GL_LINE);
 
+            const float baseR = 0.85f, baseG = 0.78f, baseB = 0.55f;
+            const float tR = e.tint ? e.tint->r : 1.f;
+            const float tG = e.tint ? e.tint->g : 1.f;
+            const float tB = e.tint ? e.tint->b : 1.f;
             m_triShader.bind();
             m_triShader.setMat4("uViewProj", VP.data());
-            m_triShader.setVec3("uColor", 0.85f, 0.78f, 0.55f);
+            m_triShader.setVec3("uColor", baseR * tR, baseG * tG, baseB * tB);
             m_triShader.setFloat("uAlpha", 1.f);
             m_triShader.setInt("uLit", isLit ? 1 : 0);
             glDrawArrays(GL_TRIANGLES, 0, (GLsizei)sm.triVertices.size());
             glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
         } else {
             const ProjectedMesh pm = projectMesh(*e.mesh, viewFromLocal,
-                                                 camera.projectionStyle == ProjectionStyle::Perspective,
+                                                 perspective4D(camera.projectionStyle),
                                                  camera.focal4,
                                                  camera.wOffset);
 
@@ -442,9 +455,13 @@ void ViewportRenderer::render(const scene::Scene& scene, const Camera4D& camera)
                              (GLsizeiptr)(pm.triVertices.size() * sizeof(ProjectedMesh::TriVertex)),
                              pm.triVertices.data(), GL_STREAM_DRAW);
 
+                const float baseR = 0.78f, baseG = 0.84f, baseB = 0.95f;
+                const float tR = e.tint ? e.tint->r : 1.f;
+                const float tG = e.tint ? e.tint->g : 1.f;
+                const float tB = e.tint ? e.tint->b : 1.f;
                 m_triShader.bind();
                 m_triShader.setMat4("uViewProj", VP.data());
-                m_triShader.setVec3("uColor", 0.78f, 0.84f, 0.95f);
+                m_triShader.setVec3("uColor", baseR * tR, baseG * tG, baseB * tB);
                 m_triShader.setFloat("uAlpha", 1.f);
                 m_triShader.setInt("uLit", isLit ? 1 : 0);
                 glDrawArrays(GL_TRIANGLES, 0, (GLsizei)pm.triVertices.size());
@@ -497,7 +514,7 @@ scene::EntityId ViewportRenderer::pickEntityAt(const scene::Scene& scene,
     const float aspect  = float(m_width) / float(m_height);
     const float fovYRad = camera.fovYDeg * 3.14159265f / 180.f;
     math::Mat4 P;
-    if (camera.projectionStyle == ProjectionStyle::Perspective) {
+    if (perspective3D(camera.projectionStyle)) {
         P = math::perspective(fovYRad, aspect, camera.zNear, camera.zFar);
     } else {
         const float halfH = std::max(0.05f, dist) * std::tan(fovYRad * 0.5f);
@@ -532,13 +549,13 @@ scene::EntityId ViewportRenderer::pickEntityAt(const scene::Scene& scene,
 
     for (const auto& e : scene.entities()) {
         if (!e.visible || !e.mesh) continue;
-        const math::Mat5 viewFromLocal = viewFromWorld * e.transform.toMatrix();
+        const math::Mat5 viewFromLocal = viewFromWorld * scene.worldMatrix(e.id);
 
         // Gather projected/sliced triangle vertices.
         std::vector<float> verts; // flat (x,y,z) per vertex, 3 verts per triangle
         if (camera.mode == ViewMode::Slice) {
             const SliceMesh sm = sliceMesh(*e.mesh, viewFromLocal,
-                                           static_cast<int>(camera.sliceAxis),
+                                           camera.sliceAxis,
                                            camera.sliceVal);
             verts.reserve(sm.triVertices.size() * 3);
             for (const auto& tv : sm.triVertices) {
@@ -546,7 +563,7 @@ scene::EntityId ViewportRenderer::pickEntityAt(const scene::Scene& scene,
             }
         } else {
             const ProjectedMesh pm = projectMesh(*e.mesh, viewFromLocal,
-                                                 camera.projectionStyle == ProjectionStyle::Perspective,
+                                                 perspective4D(camera.projectionStyle),
                                                  camera.focal4, camera.wOffset);
             verts.reserve(pm.triVertices.size() * 3);
             for (const auto& tv : pm.triVertices) {
@@ -605,7 +622,7 @@ bool ViewportRenderer::worldToScreen(const Camera4D& camera, const math::Vec4& w
     const float aspect  = float(m_width) / float(m_height);
     const float fovYRad = camera.fovYDeg * 3.14159265f / 180.f;
     math::Mat4 P;
-    if (camera.projectionStyle == ProjectionStyle::Perspective) {
+    if (perspective3D(camera.projectionStyle)) {
         P = math::perspective(fovYRad, aspect, camera.zNear, camera.zFar);
     } else {
         const float halfH = std::max(0.05f, dist) * std::tan(fovYRad * 0.5f);

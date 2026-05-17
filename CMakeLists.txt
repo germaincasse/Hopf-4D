@@ -30,9 +30,21 @@ set(HOPF_SOURCES
     src/geometry/Primitives3D.cpp
     src/geometry/Primitives4D.cpp
 
+    src/scene/Entity.cpp
     src/scene/Scene.cpp
+    src/scene/SceneSerializer.cpp
 
     src/physics/Physics.cpp
+
+    src/audio/AudioEngine.cpp
+
+    src/ui/UIAnchor.cpp
+    src/ui/UIRenderer.cpp
+
+    src/scripting/Script.cpp
+    src/scripting/ScriptRegistry.cpp
+
+    src/examples/Minesweeper4D.cpp
 
     src/render/Shader.cpp
     src/render/Slicer.cpp
@@ -40,6 +52,7 @@ set(HOPF_SOURCES
     src/render/ViewportRenderer.cpp
 
     src/editor/Editor.cpp
+    src/editor/EditorContext.cpp
     src/editor/panels/ViewportPanel.cpp
     src/editor/panels/GameViewPanel.cpp
     src/editor/panels/HierarchyPanel.cpp
@@ -63,6 +76,7 @@ target_link_libraries(Hopf PRIVATE
     glfw
     glad
     imgui
+    miniaudio
     opengl32
 )
 

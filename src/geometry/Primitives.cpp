@@ -2,7 +2,64 @@
 
 #include "PrimitivesInternal.h"
 
+#include <cstring>
+
 namespace hopf::geometry {
+
+namespace {
+
+// Stable enum-token strings for serialization. Order matches the enum.
+constexpr struct {
+    PrimitiveType type;
+    const char*   name;
+} kPrimitiveNames[] = {
+    {PrimitiveType::Triangle2D,       "Triangle2D"},
+    {PrimitiveType::Square2D,         "Square2D"},
+    {PrimitiveType::Pentagon2D,       "Pentagon2D"},
+    {PrimitiveType::Hexagon2D,        "Hexagon2D"},
+    {PrimitiveType::Star2D,           "Star2D"},
+    {PrimitiveType::Circle2D,         "Circle2D"},
+    {PrimitiveType::Cube3D,           "Cube3D"},
+    {PrimitiveType::Tetrahedron3D,    "Tetrahedron3D"},
+    {PrimitiveType::Octahedron3D,     "Octahedron3D"},
+    {PrimitiveType::Icosahedron3D,    "Icosahedron3D"},
+    {PrimitiveType::Dodecahedron3D,   "Dodecahedron3D"},
+    {PrimitiveType::Icosphere3D,      "Icosphere3D"},
+    {PrimitiveType::Sphere3D,         "Sphere3D"},
+    {PrimitiveType::Cylinder3D,       "Cylinder3D"},
+    {PrimitiveType::Cone3D,           "Cone3D"},
+    {PrimitiveType::Torus3D,          "Torus3D"},
+    {PrimitiveType::Pyramid3D,        "Pyramid3D"},
+    {PrimitiveType::Prism3D,          "Prism3D"},
+    {PrimitiveType::Capsule3D,        "Capsule3D"},
+    {PrimitiveType::Tesseract,        "Tesseract"},
+    {PrimitiveType::Pentachoron,      "Pentachoron"},
+    {PrimitiveType::Hexadecachoron,   "Hexadecachoron"},
+    {PrimitiveType::Icositetrachoron, "Icositetrachoron"},
+    {PrimitiveType::TetrahedralPrism, "TetrahedralPrism"},
+    {PrimitiveType::CubicalPyramid,   "CubicalPyramid"},
+    {PrimitiveType::OctahedralPrism,  "OctahedralPrism"},
+    {PrimitiveType::IcosahedralPrism, "IcosahedralPrism"},
+    {PrimitiveType::Cubinder,         "Cubinder"},
+    {PrimitiveType::Spherinder,       "Spherinder"},
+    {PrimitiveType::Duoprism33,       "Duoprism33"},
+    {PrimitiveType::Duoprism55,       "Duoprism55"},
+};
+
+} // namespace
+
+const char* primitiveTypeName(PrimitiveType type) {
+    for (const auto& e : kPrimitiveNames) if (e.type == type) return e.name;
+    return "Unknown";
+}
+
+bool parsePrimitiveType(const char* token, PrimitiveType& out) {
+    if (!token) return false;
+    for (const auto& e : kPrimitiveNames) {
+        if (std::strcmp(token, e.name) == 0) { out = e.type; return true; }
+    }
+    return false;
+}
 
 const char* primitiveLabel(PrimitiveType type) {
     switch (type) {

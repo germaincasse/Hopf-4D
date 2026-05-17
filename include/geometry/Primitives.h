@@ -44,6 +44,14 @@ enum class PrimitiveType {
 };
 
 const char* primitiveLabel(PrimitiveType type);
+
+// Stable enum-token name suitable for serialization. Different from primitiveLabel
+// (which is end-user UI text) because labels can be localized/renamed later.
+const char* primitiveTypeName(PrimitiveType type);
+
+// Look up a PrimitiveType from its primitiveTypeName(). Returns false if unknown.
+bool        parsePrimitiveType(const char* token, PrimitiveType& out);
+
 bool        primitiveIs2D(PrimitiveType type);
 bool        primitiveIs3D(PrimitiveType type);
 bool        primitiveIs4D(PrimitiveType type);

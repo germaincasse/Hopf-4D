@@ -50,6 +50,24 @@ target_include_directories(imgui PUBLIC
 )
 target_link_libraries(imgui PUBLIC glfw)
 
+# ---- miniaudio (single-header audio) -----------------------------------------
+FetchContent_Declare(
+    miniaudio
+    GIT_REPOSITORY https://github.com/mackron/miniaudio.git
+    GIT_TAG        0.11.21
+    GIT_SHALLOW    TRUE
+)
+FetchContent_GetProperties(miniaudio)
+if(NOT miniaudio_POPULATED)
+    FetchContent_Populate(miniaudio)
+endif()
+# Static lib that hosts the single MA_IMPLEMENTATION translation unit.
+add_library(miniaudio STATIC ${CMAKE_SOURCE_DIR}/src/audio/MiniaudioImpl.cpp)
+target_include_directories(miniaudio PUBLIC ${miniaudio_SOURCE_DIR})
+if(WIN32)
+    target_link_libraries(miniaudio PUBLIC winmm ole32)
+endif()
+
 # ---- Catch2 (only when tests are enabled) ------------------------------------
 if(HOPF_BUILD_TESTS)
     FetchContent_Declare(

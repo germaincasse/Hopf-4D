@@ -25,6 +25,25 @@ public:
     bool    removeEntity(EntityId id);
     void    moveEntityBefore(EntityId src, EntityId target);
 
+    // Set or clear (newParent == 0) the parent of an entity. No-op if the change
+    // would introduce a cycle.
+    void    setParent(EntityId child, EntityId newParent);
+
+    // World transform of an entity, walking up parents. Returns identity if the
+    // entity doesn't exist.
+    math::Mat5 worldMatrix(EntityId id) const;
+
+    // Drops all entities and meshes, resets the id counter. Used before loading.
+    void    clear();
+
+    // After bulk-loading entities (with preserved IDs) into entities(), call this
+    // so that subsequent addEntity()/addPrimitive() pick a unique next id.
+    void    refreshNextIdFromContents();
+
+    // Registers a mesh built externally (e.g. from a serializer that already created
+    // it). The returned pointer is owned by the scene.
+    const geometry::Mesh4D* takeOwnedMesh(geometry::Mesh4D mesh) { return addMesh(std::move(mesh)); }
+
     std::vector<Entity>&       entities()       { return m_entities; }
     const std::vector<Entity>& entities() const { return m_entities; }
 

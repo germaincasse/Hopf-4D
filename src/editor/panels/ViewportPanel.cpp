@@ -193,48 +193,158 @@ void ViewportPanel::render(EditorContext& ctx) {
 
         verticalSep();
 
-        if (toggleButton("Wire", "Simple wireframe", m_camera.style == render::DisplayStyle::SimpleWireframe)) {
-            m_camera.style = render::DisplayStyle::SimpleWireframe;
-        }
-        ImGui::SameLine();
-        if (toggleButton("Depth", "Depth wireframe (cool->warm gradient on w).",
-                         m_camera.style == render::DisplayStyle::DepthWireframe)) {
-            m_camera.style = render::DisplayStyle::DepthWireframe;
-        }
-        ImGui::SameLine();
-        if (toggleButton("Unlit", "Solid faces, flat color.", m_camera.style == render::DisplayStyle::SolidUnlit)) {
-            m_camera.style = render::DisplayStyle::SolidUnlit;
-        }
-        ImGui::SameLine();
-        if (toggleButton("Lit", "Solid faces, lit by the scene's first directional light.",
-                         m_camera.style == render::DisplayStyle::SolidLit)) {
-            m_camera.style = render::DisplayStyle::SolidLit;
+        // Display-style icons (Wire / Depth / Unlit / Lit) with hover tooltips.
+        {
+            const float btnH = ImGui::GetFrameHeight();
+            const float btnW = btnH * 1.2f;
+            ImDrawList* dl = ImGui::GetWindowDrawList();
+
+            auto styleBtn = [&](const char* id, render::DisplayStyle style,
+                                int kind, const char* tip) {
+                const bool active = (m_camera.style == style);
+                if (active) ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
+                const bool clicked = ImGui::Button(id, ImVec2(btnW, 0));
+                if (active) ImGui::PopStyleColor();
+
+                const ImVec2 mn = ImGui::GetItemRectMin();
+                const ImVec2 mx = ImGui::GetItemRectMax();
+                const ImVec2 c { (mn.x + mx.x) * 0.5f, (mn.y + mx.y) * 0.5f };
+                const float  r = (mx.y - mn.y) * 0.30f;
+                const ImU32 fg = active ? IM_COL32(255, 255, 255, 255) : IM_COL32(190, 200, 210, 255);
+
+                if (kind == 0) {
+                    // Wire: cube as two overlapping squares with connecting lines.
+                    const ImVec2 a0(c.x - r, c.y - r * 0.6f);
+                    const ImVec2 a1(c.x + r * 0.3f, c.y + r);
+                    const ImVec2 b0(c.x - r * 0.3f, c.y - r);
+                    const ImVec2 b1(c.x + r,        c.y + r * 0.6f);
+                    dl->AddRect(a0, a1, fg, 0.f, 0, 1.4f);
+                    dl->AddRect(b0, b1, fg, 0.f, 0, 1.4f);
+                    dl->AddLine(a0, b0, fg, 1.0f);
+                    dl->AddLine(ImVec2(a1.x, a0.y), ImVec2(b1.x, b0.y), fg, 1.0f);
+                    dl->AddLine(a1, b1, fg, 1.0f);
+                    dl->AddLine(ImVec2(a0.x, a1.y), ImVec2(b0.x, b1.y), fg, 1.0f);
+                } else if (kind == 1) {
+                    // Depth: same wireframe silhouette as Wire, but the back square
+                    // is cool-toned and the front square is warm-toned -- conveys
+                    // "wireframe coloured by depth".
+                    const ImU32 cool = IM_COL32(80, 140, 255, 255);
+                    const ImU32 warm = IM_COL32(255, 170, 80,  255);
+                    const ImVec2 a0(c.x - r,         c.y - r * 0.6f);
+                    const ImVec2 a1(c.x + r * 0.3f,  c.y + r);
+                    const ImVec2 b0(c.x - r * 0.3f,  c.y - r);
+                    const ImVec2 b1(c.x + r,         c.y + r * 0.6f);
+                    dl->AddRect(a0, a1, cool, 0.f, 0, 1.4f);  // back face: cool
+                    dl->AddRect(b0, b1, warm, 0.f, 0, 1.4f);  // front face: warm
+                    // Connecting depth edges, also gradient-toned.
+                    dl->AddLine(a0,                       b0,                       cool, 1.0f);
+                    dl->AddLine(ImVec2(a1.x, a0.y),       ImVec2(b1.x, b0.y),       cool, 1.0f);
+                    dl->AddLine(a1,                       b1,                       warm, 1.0f);
+                    dl->AddLine(ImVec2(a0.x, a1.y),       ImVec2(b0.x, b1.y),       warm, 1.0f);
+                } else if (kind == 2) {
+                    // Unlit: filled square, flat color (no shading).
+                    const ImVec2 p0(c.x - r * 0.9f, c.y - r * 0.9f);
+                    const ImVec2 p1(c.x + r * 0.9f, c.y + r * 0.9f);
+                    dl->AddRectFilled(p0, p1, fg, 1.f);
+                } else if (kind == 3) {
+                    // Lit: filled square + diagonal highlight + dark shadow band.
+                    const ImVec2 p0(c.x - r * 0.9f, c.y - r * 0.9f);
+                    const ImVec2 p1(c.x + r * 0.9f, c.y + r * 0.9f);
+                    const ImU32 light = active ? IM_COL32(255, 255, 255, 255) : IM_COL32(230, 230, 230, 255);
+                    const ImU32 dark  = IM_COL32(70, 70, 80, 255);
+                    dl->AddRectFilledMultiColor(p0, p1, light, light, dark, dark);
+                    dl->AddRect(p0, p1, IM_COL32(0, 0, 0, 180), 0.f, 0, 1.f);
+                }
+
+                if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
+                    ImGui::SetTooltip("%s", tip);
+                }
+                if (clicked) m_camera.style = style;
+            };
+
+            styleBtn("##styleWire",  render::DisplayStyle::SimpleWireframe, 0,
+                     "Wire — simple wireframe");
+            ImGui::SameLine();
+            styleBtn("##styleDepth", render::DisplayStyle::DepthWireframe,  1,
+                     "Depth — wireframe coloured by w (cool -> warm)");
+            ImGui::SameLine();
+            styleBtn("##styleUnlit", render::DisplayStyle::SolidUnlit,      2,
+                     "Unlit — solid faces, flat color");
+            ImGui::SameLine();
+            styleBtn("##styleLit",   render::DisplayStyle::SolidLit,        3,
+                     "Lit — solid faces, lit by directional lights");
         }
 
         if (m_camera.mode == render::ViewMode::Slice) {
             verticalSep();
+            // Axis-aligned slice presets (most common case).
             constexpr char letters[4] = {'X', 'Y', 'Z', 'W'};
             constexpr ImVec4 axisCols[4] = {
                 kAxisColorX, kAxisColorY, kAxisColorZ, kAxisColorW,
             };
             const char* tooltips[4] = {
-                "Slice along X", "Slice along Y", "Slice along Z", "Slice along W",
+                "Slice perpendicular to X",
+                "Slice perpendicular to Y",
+                "Slice perpendicular to Z",
+                "Slice perpendicular to W",
+            };
+            auto axisAlignedTo = [&](int i) {
+                const math::Vec4& a = m_camera.sliceAxis;
+                const float coords[4] = {a.x, a.y, a.z, a.w};
+                if (std::abs(coords[i]) < 0.999f) return false;
+                for (int j = 0; j < 4; ++j) if (j != i && std::abs(coords[j]) > 1e-3f) return false;
+                return true;
             };
             for (int i = 0; i < 4; ++i) {
                 if (i > 0) ImGui::SameLine();
-                const bool active = (static_cast<int>(m_camera.sliceAxis) == i);
                 const char buf[2] = {letters[i], '\0'};
                 ImGui::PushStyleColor(ImGuiCol_Text, axisCols[i]);
-                if (toggleButton(buf, tooltips[i], active)) {
-                    m_camera.sliceAxis = static_cast<render::SliceAxis>(i);
+                if (toggleButton(buf, tooltips[i], axisAlignedTo(i))) {
+                    m_camera.sliceAxis = math::Vec4{};
+                    (&m_camera.sliceAxis.x)[i] = 1.f;
                 }
                 ImGui::PopStyleColor();
             }
             ImGui::SameLine();
-            constexpr const char* sliderLabels[4] = { "x slice", "y slice", "z slice", "w slice" };
             ImGui::SetNextItemWidth(180.f);
-            ImGui::SliderFloat(sliderLabels[static_cast<int>(m_camera.sliceAxis)],
-                               &m_camera.sliceVal, -1.5f, 1.5f, "%.3f");
+            ImGui::SliderFloat("slice", &m_camera.sliceVal, -1.5f, 1.5f, "%.3f");
+        }
+
+        verticalSep();
+
+        // 2D / 3D / 4D viewing presets. They configure the camera so that the
+        // scene is shown as if it were a 2D / 3D / 4D world (no other state
+        // is changed apart from projection style, slice mode and orbit pose).
+        {
+            if (toggleButton("2D",
+                             "View the scene as 2D: top-down isometric on the xy plane.\n"
+                             "Slices through z = 0; w is collapsed.",
+                             m_camera.mode == render::ViewMode::Slice
+                              && std::abs(m_camera.sliceAxis.z) > 0.999f)) {
+                m_camera.mode            = render::ViewMode::Slice;
+                m_camera.sliceAxis       = {0, 0, 1, 0};
+                m_camera.sliceVal        = 0.f;
+                m_camera.projectionStyle = render::ProjectionStyle::Isometric;
+                m_camera.yaw             = 0.f;
+                m_camera.pitch           = -1.5707963f;
+            }
+            ImGui::SameLine();
+            if (toggleButton("3D",
+                             "View the scene as 3D: standard orbit, w sliced at 0.",
+                             m_camera.mode == render::ViewMode::Slice
+                              && std::abs(m_camera.sliceAxis.w) > 0.999f)) {
+                m_camera.mode            = render::ViewMode::Slice;
+                m_camera.sliceAxis       = {0, 0, 0, 1};
+                m_camera.sliceVal        = 0.f;
+                m_camera.projectionStyle = render::ProjectionStyle::Hybrid;
+            }
+            ImGui::SameLine();
+            if (toggleButton("4D",
+                             "View the scene as 4D: full projection mode (3D perspective by default).",
+                             m_camera.mode == render::ViewMode::Projection)) {
+                m_camera.mode            = render::ViewMode::Projection;
+                m_camera.projectionStyle = render::ProjectionStyle::Hybrid;
+            }
         }
 
         verticalSep();
@@ -245,19 +355,25 @@ void ViewportPanel::render(EditorContext& ctx) {
         }
         if (ImGui::BeginPopup("##cameraPopup")) {
             if (ImGui::CollapsingHeader("Projection", ImGuiTreeNodeFlags_DefaultOpen)) {
-                const bool isPersp = m_camera.projectionStyle == render::ProjectionStyle::Perspective;
                 if (toggleButton("Persp",
                                  "Perspective in both 3D and 4D (foreshortening).",
-                                 isPersp)) {
+                                 m_camera.projectionStyle == render::ProjectionStyle::Perspective)) {
                     m_camera.projectionStyle = render::ProjectionStyle::Perspective;
+                }
+                ImGui::SameLine();
+                if (toggleButton("Hybrid",
+                                 "3D perspective on screen, parallel 4D collapse.\n"
+                                 "Useful when you want depth cues without 4D foreshortening.",
+                                 m_camera.projectionStyle == render::ProjectionStyle::Hybrid)) {
+                    m_camera.projectionStyle = render::ProjectionStyle::Hybrid;
                 }
                 ImGui::SameLine();
                 if (toggleButton("Iso",
                                  "Isometric / orthographic in both 3D and 4D.",
-                                 !isPersp)) {
+                                 m_camera.projectionStyle == render::ProjectionStyle::Isometric)) {
                     m_camera.projectionStyle = render::ProjectionStyle::Isometric;
                 }
-                if (m_camera.projectionStyle == render::ProjectionStyle::Perspective) {
+                if (render::perspective4D(m_camera.projectionStyle)) {
                     ImGui::SetNextItemWidth(160.f);
                     ImGui::DragFloat("focal4",  &m_camera.focal4,  0.05f, 0.5f, 20.f, "%.2f");
                     ImGui::SetNextItemWidth(160.f);
@@ -458,12 +574,15 @@ void ViewportPanel::render(EditorContext& ctx) {
                                         : nullptr;
         if (selectedEnt && ctx.toolMode != ToolMode::Hand) {
             ImVec2 originScreen;
-            if (projectToScreen(m_renderer, m_camera, selectedEnt->transform.position, imgMin, originScreen)) {
+            // World position of the selected entity (walks parents).
+            const math::Vec4 selWorldPos =
+                ctx.scene->worldMatrix(selectedEnt->id).transformPoint({0.f, 0.f, 0.f, 0.f});
+            if (projectToScreen(m_renderer, m_camera, selWorldPos, imgMin, originScreen)) {
                 const float gizmoLen = std::max(0.3f, m_camera.distance * 0.18f);
                 const ImVec2 mp      = ImGui::GetIO().MousePos;
 
                 auto worldDir = [&](int axis, float length) {
-                    math::Vec4 p = selectedEnt->transform.position;
+                    math::Vec4 p = selWorldPos;
                     p[axis] += length;
                     return p;
                 };
@@ -589,15 +708,18 @@ void ViewportPanel::render(EditorContext& ctx) {
                 if (d2 <= h.radius * h.radius && d2 < bestD2) { bestD2 = d2; picked = h.handle; }
             }
             if (picked >= 0) {
-                m_drag.active       = true;
-                m_drag.entityId     = ctx.selected;
-                m_drag.mode         = ctx.toolMode;
-                m_drag.handle       = picked;
-                m_drag.mouseStart   = io.MousePos;
-                m_drag.initialPos   = selectedEnt->transform.position;
-                m_drag.initialScale = selectedEnt->transform.scale;
-                m_drag.initialRot   = selectedEnt->transform.rotation;
-                m_clickPending      = false;
+                ctx.pushUndo();
+                m_drag.active          = true;
+                m_drag.entityId        = ctx.selected;
+                m_drag.mode            = ctx.toolMode;
+                m_drag.handle          = picked;
+                m_drag.mouseStart      = io.MousePos;
+                m_drag.initialPos      = selectedEnt->transform.position;
+                m_drag.initialWorldPos = ctx.scene->worldMatrix(selectedEnt->id)
+                                            .transformPoint({0.f, 0.f, 0.f, 0.f});
+                m_drag.initialScale    = selectedEnt->transform.scale;
+                m_drag.initialRot      = selectedEnt->transform.rotation;
+                m_clickPending         = false;
             }
         }
 
@@ -614,8 +736,8 @@ void ViewportPanel::render(EditorContext& ctx) {
                         const int axis = m_drag.handle;
                         // Recompute the axis screen direction at the *initial* position to avoid drift.
                         ImVec2 o, t;
-                        if (projectToScreen(m_renderer, m_camera, m_drag.initialPos, imgMin, o)) {
-                            math::Vec4 tipW = m_drag.initialPos; tipW[axis] += 1.f;
+                        if (projectToScreen(m_renderer, m_camera, m_drag.initialWorldPos, imgMin, o)) {
+                            math::Vec4 tipW = m_drag.initialWorldPos; tipW[axis] += 1.f;
                             if (projectToScreen(m_renderer, m_camera, tipW, imgMin, t)) {
                                 const float dx = t.x - o.x, dy = t.y - o.y;
                                 const float lenSq = dx * dx + dy * dy;
@@ -631,8 +753,8 @@ void ViewportPanel::render(EditorContext& ctx) {
                     if (m_drag.handle >= 0 && m_drag.handle < 4) {
                         const int axis = m_drag.handle;
                         ImVec2 o, t;
-                        if (projectToScreen(m_renderer, m_camera, m_drag.initialPos, imgMin, o)) {
-                            math::Vec4 tipW = m_drag.initialPos; tipW[axis] += 1.f;
+                        if (projectToScreen(m_renderer, m_camera, m_drag.initialWorldPos, imgMin, o)) {
+                            math::Vec4 tipW = m_drag.initialWorldPos; tipW[axis] += 1.f;
                             if (projectToScreen(m_renderer, m_camera, tipW, imgMin, t)) {
                                 const float dx = t.x - o.x, dy = t.y - o.y;
                                 const float lenSq = dx * dx + dy * dy;
@@ -711,6 +833,36 @@ void ViewportPanel::render(EditorContext& ctx) {
                     const float v = io.MousePos.y - imgMin.y;
                     ctx.selected = m_renderer.pickEntityAt(*ctx.scene, m_camera, u, v);
                 }
+            }
+        }
+
+        // F: focus camera on the selected entity. Repeated presses toggle a close /
+        // far distance. The camera lerps toward the target each frame for smoothness.
+        if (hovered && !io.WantTextInput && ImGui::IsKeyPressed(ImGuiKey_F, false)
+            && selectedEnt && ctx.scene)
+        {
+            const math::Vec4 wp = ctx.scene->worldMatrix(selectedEnt->id)
+                                       .transformPoint({0.f, 0.f, 0.f, 0.f});
+            m_focusActive   = true;
+            m_focusFar      = !m_focusFar;
+            m_focusPivotX   = wp.x;
+            m_focusPivotY   = wp.y;
+            m_focusPivotZ   = wp.z;
+            m_focusDistance = m_focusFar ? 12.f : 4.f;
+        }
+        if (m_focusActive) {
+            const float dt = ImGui::GetIO().DeltaTime;
+            const float k  = 1.f - std::exp(-8.f * dt);
+            m_camera.pivotX   += (m_focusPivotX   - m_camera.pivotX)   * k;
+            m_camera.pivotY   += (m_focusPivotY   - m_camera.pivotY)   * k;
+            m_camera.pivotZ   += (m_focusPivotZ   - m_camera.pivotZ)   * k;
+            m_camera.distance += (m_focusDistance - m_camera.distance) * k;
+            const float dx = m_focusPivotX - m_camera.pivotX;
+            const float dy = m_focusPivotY - m_camera.pivotY;
+            const float dz = m_focusPivotZ - m_camera.pivotZ;
+            const float dd = m_focusDistance - m_camera.distance;
+            if (dx*dx + dy*dy + dz*dz < 1e-4f && std::abs(dd) < 1e-3f) {
+                m_focusActive = false;
             }
         }
     }

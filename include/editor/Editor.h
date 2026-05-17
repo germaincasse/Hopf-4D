@@ -39,8 +39,11 @@ private:
     void snapshotScene(scene::Scene& scene);
     void restoreScene(scene::Scene& scene);
 
-    bool                                m_initialized = false;
-    bool                                m_layoutBuilt = false;
+    bool                                m_initialized   = false;
+    bool                                m_layoutBuilt   = false;
+    bool                                m_openSaveDlg   = false;
+    bool                                m_openLoadDlg   = false;
+    char                                m_filePath[260] = "scene.hopf";
     EditorContext                       m_ctx;
     std::vector<std::unique_ptr<Panel>> m_panels;
     int                                 m_nextViewportId = 1;

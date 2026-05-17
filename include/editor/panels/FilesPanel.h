@@ -15,7 +15,7 @@ public:
     void        render(EditorContext& ctx) override;
 
 private:
-    void renderEntry(const std::filesystem::path& path);
+    void renderEntry(const std::filesystem::path& path, EditorContext& ctx);
 
     std::filesystem::path m_root;
     std::string           m_rootBuf;

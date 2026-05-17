@@ -309,13 +309,8 @@ void step(scene::Scene& scene, float dt) {
     auto& ents = scene.entities();
 
     for (auto& e : ents) {
-        e.transform.rotation.xy += e.autoRotate.xy * dt;
-        e.transform.rotation.xz += e.autoRotate.xz * dt;
-        e.transform.rotation.xw += e.autoRotate.xw * dt;
-        e.transform.rotation.yz += e.autoRotate.yz * dt;
-        e.transform.rotation.yw += e.autoRotate.yw * dt;
-        e.transform.rotation.zw += e.autoRotate.zw * dt;
-
+        // Note: autoRotate is integrated unconditionally in Application::run so it
+        // ticks even when not in Play mode. Physics handles only gravity + bodies.
         if (!e.rigidbody.has_value() || e.rigidbody->kinematic) continue;
 
         if (e.rigidbody->useGravity) {

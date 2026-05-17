@@ -1,11 +1,16 @@
 #include "core/Application.h"
 
+#include "audio/AudioEngine.h"
 #include "core/Logger.h"
 #include "geometry/Primitives.h"
 #include "physics/Physics.h"
+#include "scene/Scene.h"
+#include "scripting/Script.h"
 
 #include <glad/gl.h>
 #include <GLFW/glfw3.h>
+
+#include <vector>
 
 namespace hopf::core {
 
@@ -20,6 +25,9 @@ Application::Application() {
     m_editor = std::make_unique<editor::Editor>();
     m_editor->init(m_window->native());
 
+    m_audio = std::make_unique<audio::AudioEngine>();
+    m_audio->init();
+
     m_scene = std::make_unique<scene::Scene>();
     m_scene->setName("Untitled.hopf");
     buildDefaultScene();
@@ -30,6 +38,8 @@ Application::Application() {
 Application::~Application() {
     if (m_editor) m_editor->shutdown();
     m_editor.reset();
+    if (m_audio) m_audio->shutdown();
+    m_audio.reset();
     m_window.reset();
 }
 
@@ -47,10 +57,12 @@ void Application::buildDefaultScene() {
     auto& cam = m_scene->addEntity("Main Camera");
     cam.camera4D = scene::Camera4DComponent{};
     cam.camera4D->isMain = true;
+    cam.audioListener = scene::AudioListenerComponent{};
 }
 
 int Application::run() {
     double lastTime = glfwGetTime();
+    auto prevPlayState = editor::PlayState::Stopped;
 
     while (!m_window->shouldClose()) {
         m_window->pollEvents();
@@ -59,8 +71,55 @@ int Application::run() {
         const float  dt  = static_cast<float>(now - lastTime);
         lastTime = now;
 
-        if (m_editor->playState() == editor::PlayState::Playing) {
+        // Editor-time animations: autoRotate ticks every frame, regardless of play state.
+        for (auto& e : m_scene->entities()) {
+            e.transform.rotation.xy += e.autoRotate.xy * dt;
+            e.transform.rotation.xz += e.autoRotate.xz * dt;
+            e.transform.rotation.xw += e.autoRotate.xw * dt;
+            e.transform.rotation.yz += e.autoRotate.yz * dt;
+            e.transform.rotation.yw += e.autoRotate.yw * dt;
+            e.transform.rotation.zw += e.autoRotate.zw * dt;
+        }
+
+        const auto playState = m_editor->playState();
+
+        // On the Stopped -> Playing edge: bind scripts, fire onStart, spawn audio sources.
+        // We snapshot the (entity, script*) pairs first so that scripts which spawn
+        // additional entities during onStart don't invalidate the iterator.
+        if (playState == editor::PlayState::Playing
+            && prevPlayState != editor::PlayState::Playing)
+        {
+            struct Pending { scene::EntityId id; scripting::Script* script; };
+            std::vector<Pending> pending;
+            for (auto& e : m_scene->entities()) {
+                for (auto& s : e.scripts) {
+                    if (s.instance) pending.push_back({e.id, s.instance.get()});
+                }
+            }
+            for (auto& p : pending) {
+                p.script->_bind(p.id, m_scene.get());
+                p.script->onStart();
+            }
+            if (m_audio) m_audio->onPlayStart(*m_scene);
+        }
+        // On the Playing -> Stopped edge: tear down running sounds.
+        if (playState == editor::PlayState::Stopped
+            && prevPlayState != editor::PlayState::Stopped)
+        {
+            if (m_audio) m_audio->onPlayStop();
+        }
+        prevPlayState = playState;
+
+        if (playState == editor::PlayState::Playing) {
             physics::step(*m_scene, dt);
+            std::vector<scripting::Script*> updates;
+            for (auto& e : m_scene->entities()) {
+                for (auto& s : e.scripts) {
+                    if (s.instance) updates.push_back(s.instance.get());
+                }
+            }
+            for (auto* s : updates) s->onUpdate(dt);
+            if (m_audio) m_audio->update(*m_scene);
         }
 
         int fbW = 0, fbH = 0;

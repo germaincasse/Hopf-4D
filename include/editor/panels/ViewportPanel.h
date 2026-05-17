@@ -30,7 +30,8 @@ private:
         ToolMode         mode     = ToolMode::Hand;
         int              handle   = -1; // 0..3 (axes) or 0..5 (rotation planes) or 0..4 (scale + uniform)
         ImVec2           mouseStart{};
-        math::Vec4       initialPos{};
+        math::Vec4       initialPos{};      // local position at drag start
+        math::Vec4       initialWorldPos{}; // world position at drag start (used for screen projection)
         math::Vec4       initialScale{1.f, 1.f, 1.f, 1.f};
         math::Rotor4     initialRot{};
     };
@@ -41,6 +42,16 @@ private:
     render::ViewportRenderer m_renderer;
     bool                     m_clickPending = false;
     GizmoDrag                m_drag{};
+
+    // Smooth focus-target state: when the user presses F on a selected entity, the
+    // pivot and distance lerp toward (entity world pos, close/far). Repeated F
+    // presses toggle between a close and a far distance.
+    bool   m_focusActive  = false;
+    bool   m_focusFar     = false;
+    float  m_focusPivotX  = 0.f;
+    float  m_focusPivotY  = 0.f;
+    float  m_focusPivotZ  = 0.f;
+    float  m_focusDistance = 5.f;
 };
 
 } // namespace hopf::editor

@@ -1,5 +1,7 @@
 #include "editor/Editor.h"
 
+#include "core/Logger.h"
+
 #include "editor/panels/ConsolePanel.h"
 #include "editor/panels/FilesPanel.h"
 #include "editor/panels/GameViewPanel.h"
@@ -8,6 +10,7 @@
 #include "editor/panels/ViewportPanel.h"
 
 #include "scene/Scene.h"
+#include "scene/SceneSerializer.h"
 
 #include <glad/gl.h>
 #include <GLFW/glfw3.h>
@@ -187,6 +190,21 @@ void Editor::renderUI(scene::Scene& scene) {
     ImGui::PopStyleVar(3);
 
     if (ImGui::BeginMenuBar()) {
+        if (ImGui::BeginMenu("File")) {
+            if (ImGui::MenuItem("Save project", "Ctrl+S"))      m_openSaveDlg = true;
+            if (ImGui::MenuItem("Open project...", "Ctrl+O"))   m_openLoadDlg = true;
+            ImGui::Separator();
+            if (ImGui::MenuItem("Export game (.exe)...")) {
+                core::Logger::info("Export: not implemented yet. Will bundle the engine binary "
+                                   "and the active scene into a standalone runtime.");
+            }
+            ImGui::Separator();
+            if (ImGui::MenuItem("Exit", "Alt+F4")) {
+                if (auto* w = ImGui::GetMainViewport(); w && w->PlatformHandleRaw)
+                    glfwSetWindowShouldClose(static_cast<GLFWwindow*>(w->PlatformHandleRaw), GLFW_TRUE);
+            }
+            ImGui::EndMenu();
+        }
         if (ImGui::BeginMenu("Window")) {
             for (auto& p : m_panels) {
                 bool open = p->isOpen();
@@ -290,6 +308,34 @@ void Editor::renderUI(scene::Scene& scene) {
         if (p->isOpen()) p->render(m_ctx);
     }
 
+    // Save / Open modal dialogs.
+    if (m_openSaveDlg) { ImGui::OpenPopup("Save Scene"); m_openSaveDlg = false; }
+    if (m_openLoadDlg) { ImGui::OpenPopup("Open Scene"); m_openLoadDlg = false; }
+    if (ImGui::BeginPopupModal("Save Scene", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::InputText("Path##save", m_filePath, sizeof(m_filePath));
+        if (ImGui::Button("Save", ImVec2(120, 0))) {
+            if (scene::saveScene(scene, m_filePath))
+                core::Logger::info("Saved scene to %s", m_filePath);
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel", ImVec2(120, 0))) ImGui::CloseCurrentPopup();
+        ImGui::EndPopup();
+    }
+    if (ImGui::BeginPopupModal("Open Scene", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::InputText("Path##load", m_filePath, sizeof(m_filePath));
+        if (ImGui::Button("Open", ImVec2(120, 0))) {
+            m_ctx.undoStack.clear();
+            m_ctx.selected = 0;
+            if (scene::loadScene(scene, m_filePath))
+                core::Logger::info("Loaded scene from %s", m_filePath);
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel", ImVec2(120, 0))) ImGui::CloseCurrentPopup();
+        ImGui::EndPopup();
+    }
+
     processShortcuts();
 }
 
@@ -337,12 +383,20 @@ void Editor::processShortcuts() {
         if (ImGui::IsKeyPressed(ImGuiKey_R, false)) m_ctx.toolMode = ToolMode::Scale;
     }
 
+    if (ctrl && ImGui::IsKeyPressed(ImGuiKey_Z, false)) {
+        m_ctx.undo();
+    }
+    if (ctrl && ImGui::IsKeyPressed(ImGuiKey_S, false)) m_openSaveDlg = true;
+    if (ctrl && ImGui::IsKeyPressed(ImGuiKey_O, false)) m_openLoadDlg = true;
+
     if (m_ctx.selected != 0 && ImGui::IsKeyPressed(ImGuiKey_Delete, false)) {
+        m_ctx.pushUndo();
         m_ctx.scene->removeEntity(m_ctx.selected);
         m_ctx.selected = 0;
     }
     if (m_ctx.selected != 0 && ctrl && ImGui::IsKeyPressed(ImGuiKey_D, false)) {
         if (auto* src = m_ctx.scene->findEntity(m_ctx.selected)) {
+            m_ctx.pushUndo();
             auto& dup = m_ctx.scene->duplicateEntity(*src, src->name + " copy");
             m_ctx.selected = dup.id;
         }
@@ -354,6 +408,7 @@ void Editor::processShortcuts() {
         }
     }
     if (ctrl && ImGui::IsKeyPressed(ImGuiKey_V, false) && m_ctx.clipboard.has_value()) {
+        m_ctx.pushUndo();
         auto& pasted = m_ctx.scene->duplicateEntity(*m_ctx.clipboard, m_ctx.clipboard->name);
         m_ctx.selected = pasted.id;
     }

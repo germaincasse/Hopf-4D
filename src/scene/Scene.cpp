@@ -21,6 +21,7 @@ Entity& Scene::addPrimitive(geometry::PrimitiveType type, float size) {
     auto* mesh = addMesh(geometry::buildPrimitive(type, size));
     auto& e = addEntity(geometry::primitiveLabel(type));
     e.mesh = mesh;
+    e.primitiveType = geometry::primitiveTypeName(type);
     return e;
 }
 
@@ -74,6 +75,49 @@ Entity* Scene::findEntity(EntityId id) {
 const Entity* Scene::findEntity(EntityId id) const {
     for (const auto& e : m_entities) if (e.id == id) return &e;
     return nullptr;
+}
+
+void Scene::setParent(EntityId child, EntityId newParent) {
+    if (child == 0 || child == newParent) return;
+    auto* c = findEntity(child);
+    if (!c) return;
+    // Reject cycles: walking up newParent must not hit child.
+    EntityId walk = newParent;
+    while (walk != 0) {
+        if (walk == child) return;
+        const auto* p = findEntity(walk);
+        if (!p) break;
+        walk = p->parent;
+    }
+    c->parent = newParent;
+}
+
+void Scene::clear() {
+    m_entities.clear();
+    m_meshes.clear();
+    m_nextId = 1;
+}
+
+void Scene::refreshNextIdFromContents() {
+    EntityId maxId = 0;
+    for (const auto& e : m_entities) if (e.id > maxId) maxId = e.id;
+    m_nextId = maxId + 1;
+}
+
+math::Mat5 Scene::worldMatrix(EntityId id) const {
+    const auto* e = findEntity(id);
+    if (!e) return math::Mat5::identity();
+    math::Mat5 m = e->transform.toMatrix();
+    EntityId pid = e->parent;
+    // Safety against accidental cycles: cap at depth 64.
+    int guard = 64;
+    while (pid != 0 && guard-- > 0) {
+        const auto* p = findEntity(pid);
+        if (!p) break;
+        m = p->transform.toMatrix() * m;
+        pid = p->parent;
+    }
+    return m;
 }
 
 } // namespace hopf::scene
