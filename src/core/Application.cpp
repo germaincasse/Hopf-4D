@@ -47,6 +47,20 @@ Application::Application() {
     if (!std::filesystem::exists(defaultScenePath, ec)) {
         scene::saveScene(*m_scene, defaultScenePath);
     }
+
+    // Mirror the engine's bundled examples folder (next to the cwd) into the
+    // project, so the Files panel surfaces ready-to-play example scenes.
+    const auto srcExamples = std::filesystem::current_path(ec) / "examples";
+    const auto dstExamples = projectDir / "examples";
+    if (std::filesystem::exists(srcExamples, ec)) {
+        std::filesystem::create_directories(dstExamples, ec);
+        for (const auto& entry : std::filesystem::directory_iterator(srcExamples, ec)) {
+            std::filesystem::copy_file(entry.path(),
+                                       dstExamples / entry.path().filename(),
+                                       std::filesystem::copy_options::overwrite_existing, ec);
+        }
+    }
+
     m_projectDir = projectDir;
 
     Logger::info("Application initialized");

@@ -554,6 +554,42 @@ void ViewportPanel::render(EditorContext& ctx) {
                                              ImVec2(c.x + r * 0.35f, c.y + r * 0.55f),
                                              col, 2.f);
                     dlOverlay->AddCircleFilled(ImVec2(c.x + r * 0.55f, c.y), r * 0.35f, col, 14);
+
+                    // Unity-style frustum gizmo: a small rectangular pyramid with the apex
+                    // at the camera entity and the base projected forward along its local
+                    // -Z axis. Tells you at a glance which way the camera is looking.
+                    const float forwardDist = std::max(0.6f, m_camera.distance * 0.20f);
+                    float aspect = 1.55f, halfH = forwardDist * 0.35f;
+                    if (e.camera2D.has_value()) {
+                        halfH  = e.camera2D->orthoSize * 0.18f;
+                    } else if (e.camera3D.has_value() && !e.camera3D->perspective) {
+                        halfH  = e.camera3D->orthoHalfH * 0.18f;
+                    }
+                    const float halfW = halfH * aspect;
+                    const math::Mat5 worldFromCam = ctx.scene->worldMatrix(e.id);
+                    const math::Vec4 localCorners[4] = {
+                        { +halfW, +halfH, -forwardDist, 0.f},
+                        { -halfW, +halfH, -forwardDist, 0.f},
+                        { -halfW, -halfH, -forwardDist, 0.f},
+                        { +halfW, -halfH, -forwardDist, 0.f},
+                    };
+                    ImVec2 cornerScreen[4];
+                    bool   cornerOk[4]{};
+                    for (int i = 0; i < 4; ++i) {
+                        const math::Vec4 wp = worldFromCam.transformPoint(localCorners[i]);
+                        cornerOk[i] = projectToScreen(m_renderer, m_camera, wp, imgMin, cornerScreen[i]);
+                    }
+                    const ImU32 frustumCol = sel ? IM_COL32(220, 220, 230, 220)
+                                                 : IM_COL32(170, 170, 180, 200);
+                    for (int i = 0; i < 4; ++i) {
+                        if (cornerOk[i]) dlOverlay->AddLine(c, cornerScreen[i], frustumCol, 1.0f);
+                    }
+                    for (int i = 0; i < 4; ++i) {
+                        const int j = (i + 1) % 4;
+                        if (cornerOk[i] && cornerOk[j]) {
+                            dlOverlay->AddLine(cornerScreen[i], cornerScreen[j], frustumCol, 1.0f);
+                        }
+                    }
                 }
             }
         }

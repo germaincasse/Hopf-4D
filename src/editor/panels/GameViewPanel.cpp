@@ -95,6 +95,19 @@ void GameViewPanel::render(EditorContext& ctx) {
     m_camera.bgB           = c4.bg.b;
     m_camera.showWorldAxes = false;
 
+    // The 4D pipeline already brings the scene into camera-relative space via
+    // viewFromWorld = R^-1 * translate(-position). After that step, the camera
+    // sits at the 3D origin and its forward is the local -Z. So we tie the 3D
+    // orbit to "look straight along -Z from the origin" -- otherwise the orbit
+    // applies an extra arbitrary tilt and the Game view doesn't match the
+    // frustum gizmo drawn in the editor viewport.
+    m_camera.yaw      = 0.f;
+    m_camera.pitch    = 0.f;
+    m_camera.distance = 1.f;
+    m_camera.pivotX   = 0.f;
+    m_camera.pivotY   = 0.f;
+    m_camera.pivotZ   = -1.f;
+
     const ImVec2 avail = ImGui::GetContentRegionAvail();
     if (avail.x > 1.f && avail.y > 1.f) {
         m_renderer.resize(static_cast<int>(avail.x), static_cast<int>(avail.y));
