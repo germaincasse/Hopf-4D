@@ -27,6 +27,7 @@ struct AutoRotate {
 // auto-rotate) to change where the light shines from.
 struct DirectionalLight {
     float intensity = 1.f;
+    float r = 1.f, g = 1.f, b = 1.f; // light tint, multiplied with the diffuse term
 };
 
 struct CameraBackground {

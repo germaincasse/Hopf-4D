@@ -109,6 +109,12 @@ void InspectorPanel::render(EditorContext& ctx) {
         if (ImGui::CollapsingHeader("Directional Light", ImGuiTreeNodeFlags_DefaultOpen)) {
             ImGui::TextDisabled("Direction = transform.rotation applied to (0, -1, 0, 0).");
             ImGui::DragFloat("Intensity##light", &entity->light->intensity, 0.05f, 0.f, 10.f);
+            float col[3] = {entity->light->r, entity->light->g, entity->light->b};
+            if (ImGui::ColorEdit3("Color##light", col, ImGuiColorEditFlags_PickerHueWheel)) {
+                entity->light->r = col[0];
+                entity->light->g = col[1];
+                entity->light->b = col[2];
+            }
             if (ImGui::Button("Remove light")) entity->light.reset();
         }
     }
@@ -221,7 +227,17 @@ void InspectorPanel::render(EditorContext& ctx) {
         if (!entity->camera2D.has_value() && !entity->camera3D.has_value() && !entity->camera4D.has_value()) {
             if (ImGui::MenuItem("Camera 2D")) entity->camera2D = scene::Camera2DComponent{};
             if (ImGui::MenuItem("Camera 3D")) entity->camera3D = scene::Camera3DComponent{};
-            if (ImGui::MenuItem("Camera 4D")) entity->camera4D = scene::Camera4DComponent{};
+            if (ImGui::MenuItem("Camera 4D")) {
+                entity->camera4D = scene::Camera4DComponent{};
+                bool anyMain = false;
+                for (const auto& other : ctx.scene->entities()) {
+                    if (other.id != entity->id && other.camera4D.has_value() && other.camera4D->isMain) {
+                        anyMain = true;
+                        break;
+                    }
+                }
+                if (!anyMain) entity->camera4D->isMain = true;
+            }
         }
         ImGui::EndPopup();
     }

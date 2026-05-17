@@ -32,7 +32,7 @@ struct GridSettings {
     bool  showYW = false;
     bool  showZW = false;
     float opacity = 0.35f;
-    int   cells   = 10;    // grid extent: cells/2 lines on either side of the origin
+    int   cells   = 100;   // grid extent: cells/2 lines on either side of the origin
 };
 
 struct Camera4D {

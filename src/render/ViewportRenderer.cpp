@@ -367,25 +367,42 @@ void ViewportRenderer::render(const scene::Scene& scene, const Camera4D& camera)
     glDisable(GL_BLEND);
     glDepthMask(GL_TRUE);
 
-    // Pick the first visible directional light. The light's direction comes from the
-    // owning entity's transform.rotation applied to a canonical "down" vector. After the
-    // view transform and 4D->3D projection, it lives in the same space as triangle normals.
+    // Collect up to kMaxLights visible directional lights. Each entity's light direction
+    // is its rotation applied to the canonical "down" vector, then transformed into view
+    // space and projected to 3D so it lives in the same frame as triangle normals.
+    constexpr int kMaxLights = 4;
+    struct GpuLight { float dx, dy, dz; float intensity; float r, g, b; };
+    std::array<GpuLight, kMaxLights> lights{};
+    int numLights = 0;
     const math::Vec4 lightCanonical{0.f, -1.f, 0.f, 0.f};
-    math::Vec4 lightDir4 = lightCanonical;
-    float      lightIntensity = 1.f;
     for (const auto& e : scene.entities()) {
-        if (e.visible && e.light.has_value()) {
-            lightDir4 = e.transform.rotation.toMatrix().transformDirection(lightCanonical);
-            lightIntensity = e.light->intensity;
-            break;
-        }
+        if (!e.visible || !e.light.has_value()) continue;
+        if (numLights >= kMaxLights) break;
+        const math::Vec4 d4 = e.transform.rotation.toMatrix().transformDirection(lightCanonical);
+        const math::Vec4 dView = viewFromWorld.transformDirection(d4);
+        const auto d3 = projectDir4to3(dView, camera);
+        // Shader expects direction TO the light source (n . l).
+        float lx = -d3[0], ly = -d3[1], lz = -d3[2];
+        const float len = std::sqrt(lx * lx + ly * ly + lz * lz);
+        if (len > 1e-5f) { lx /= len; ly /= len; lz /= len; }
+        lights[numLights++] = {lx, ly, lz,
+                               e.light->intensity,
+                               e.light->r, e.light->g, e.light->b};
     }
-    const math::Vec4 lightDirView = viewFromWorld.transformDirection(lightDir4);
-    auto ld3 = projectDir4to3(lightDirView, camera);
-    // Shader expects direction TO the light source (n . l).
-    float lx = -ld3[0], ly = -ld3[1], lz = -ld3[2];
-    const float lLen = std::sqrt(lx*lx + ly*ly + lz*lz);
-    if (lLen > 1e-5f) { lx /= lLen; ly /= lLen; lz /= lLen; }
+
+    // Push the light array to the triangle shader once: uniforms are program state so they
+    // persist across binds inside the entity loop.
+    m_triShader.bind();
+    m_triShader.setInt("uNumLights", numLights);
+    for (int i = 0; i < numLights; ++i) {
+        char name[40];
+        std::snprintf(name, sizeof(name), "uLightDir[%d]", i);
+        m_triShader.setVec3(name, lights[i].dx, lights[i].dy, lights[i].dz);
+        std::snprintf(name, sizeof(name), "uLightIntensity[%d]", i);
+        m_triShader.setFloat(name, lights[i].intensity);
+        std::snprintf(name, sizeof(name), "uLightColor[%d]", i);
+        m_triShader.setVec3(name, lights[i].r, lights[i].g, lights[i].b);
+    }
 
     for (const auto& e : scene.entities()) {
         if (!e.visible || !e.mesh) continue;
@@ -410,8 +427,6 @@ void ViewportRenderer::render(const scene::Scene& scene, const Camera4D& camera)
             m_triShader.setVec3("uColor", 0.85f, 0.78f, 0.55f);
             m_triShader.setFloat("uAlpha", 1.f);
             m_triShader.setInt("uLit", isLit ? 1 : 0);
-            m_triShader.setVec3("uLightDir", lx, ly, lz);
-            m_triShader.setFloat("uLightIntensity", lightIntensity);
             glDrawArrays(GL_TRIANGLES, 0, (GLsizei)sm.triVertices.size());
             glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
         } else {
@@ -432,8 +447,6 @@ void ViewportRenderer::render(const scene::Scene& scene, const Camera4D& camera)
                 m_triShader.setVec3("uColor", 0.78f, 0.84f, 0.95f);
                 m_triShader.setFloat("uAlpha", 1.f);
                 m_triShader.setInt("uLit", isLit ? 1 : 0);
-                m_triShader.setVec3("uLightDir", lx, ly, lz);
-                m_triShader.setFloat("uLightIntensity", lightIntensity);
                 glDrawArrays(GL_TRIANGLES, 0, (GLsizei)pm.triVertices.size());
             } else if (!isSolid && !pm.lineIndices.empty()) {
                 glBindVertexArray(m_lineVao);

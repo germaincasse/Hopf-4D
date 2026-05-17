@@ -70,6 +70,14 @@ void renderAddObjectMenu(EditorContext& ctx) {
         if (ImGui::MenuItem("Camera4D") && ctx.scene) {
             auto& e = ctx.scene->addEntity("Camera4D");
             e.camera4D = scene::Camera4DComponent{};
+            bool anyMain = false;
+            for (const auto& other : ctx.scene->entities()) {
+                if (other.id != e.id && other.camera4D.has_value() && other.camera4D->isMain) {
+                    anyMain = true;
+                    break;
+                }
+            }
+            if (!anyMain) e.camera4D->isMain = true;
             ctx.selected = e.id;
         }
         ImGui::EndMenu();

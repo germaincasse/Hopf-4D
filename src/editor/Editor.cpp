@@ -149,13 +149,15 @@ void Editor::buildDefaultLayout(unsigned int dockspaceId) {
     ImGui::DockBuilderAddNode(dockspaceId, ImGuiDockNodeFlags_DockSpace);
     ImGui::DockBuilderSetNodeSize(dockspaceId, ImGui::GetMainViewport()->Size);
 
-    ImGuiID center = dockspaceId;
-    ImGuiID right  = ImGui::DockBuilderSplitNode(center, ImGuiDir_Right, 0.22f, nullptr, &center);
-    ImGuiID left   = ImGui::DockBuilderSplitNode(center, ImGuiDir_Left,  0.20f, nullptr, &center);
-    ImGuiID bottom = ImGui::DockBuilderSplitNode(center, ImGuiDir_Down,  0.25f, nullptr, &center);
+    ImGuiID center    = dockspaceId;
+    ImGuiID right     = ImGui::DockBuilderSplitNode(center, ImGuiDir_Right, 0.22f, nullptr, &center);
+    ImGuiID left      = ImGui::DockBuilderSplitNode(center, ImGuiDir_Left,  0.20f, nullptr, &center);
+    ImGuiID bottom    = ImGui::DockBuilderSplitNode(center, ImGuiDir_Down,  0.25f, nullptr, &center);
+    // Split the remaining center horizontally so Viewport sits left and Game sits right.
+    ImGuiID gameRight = ImGui::DockBuilderSplitNode(center, ImGuiDir_Right, 0.45f, nullptr, &center);
 
     ImGui::DockBuilderDockWindow("Viewport (4D)", center);
-    ImGui::DockBuilderDockWindow("Game",          center);
+    ImGui::DockBuilderDockWindow("Game",          gameRight);
     ImGui::DockBuilderDockWindow("Hierarchy",     left);
     ImGui::DockBuilderDockWindow("Inspector",     right);
     ImGui::DockBuilderDockWindow("Console",       bottom);
@@ -327,6 +329,13 @@ void Editor::processShortcuts() {
 
     if (!m_ctx.scene) return;
     if (io.WantTextInput) return;
+
+    if (!ctrl) {
+        if (ImGui::IsKeyPressed(ImGuiKey_Q, false)) m_ctx.toolMode = ToolMode::Hand;
+        if (ImGui::IsKeyPressed(ImGuiKey_W, false)) m_ctx.toolMode = ToolMode::Translate;
+        if (ImGui::IsKeyPressed(ImGuiKey_E, false)) m_ctx.toolMode = ToolMode::Rotate;
+        if (ImGui::IsKeyPressed(ImGuiKey_R, false)) m_ctx.toolMode = ToolMode::Scale;
+    }
 
     if (m_ctx.selected != 0 && ImGui::IsKeyPressed(ImGuiKey_Delete, false)) {
         m_ctx.scene->removeEntity(m_ctx.selected);

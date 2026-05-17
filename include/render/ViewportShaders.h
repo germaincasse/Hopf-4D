@@ -52,15 +52,22 @@ flat in vec3 vNormal;
 uniform vec3  uColor;
 uniform float uAlpha;
 uniform int   uLit;
-uniform vec3  uLightDir;       // unit vector pointing to the light source, render space
-uniform float uLightIntensity; // 1.0 = nominal
+const int kMaxLights = 4;
+uniform int   uNumLights;
+uniform vec3  uLightDir[kMaxLights];       // unit vector toward each light, render space
+uniform float uLightIntensity[kMaxLights]; // 1.0 = nominal
+uniform vec3  uLightColor[kMaxLights];     // tint per light
 out vec4 oColor;
 void main() {
     vec3 c = uColor;
     if (uLit == 1) {
-        vec3 n = normalize(vNormal);
-        float ndl = max(0.15, dot(n, uLightDir)) * uLightIntensity;
-        c *= ndl;
+        vec3 n   = normalize(vNormal);
+        vec3 lit = vec3(0.15); // ambient floor so unlit faces aren't pitch black
+        for (int i = 0; i < uNumLights; ++i) {
+            float ndl = max(0.0, dot(n, uLightDir[i])) * uLightIntensity[i];
+            lit += ndl * uLightColor[i];
+        }
+        c *= lit;
     }
     oColor = vec4(c, uAlpha);
 }
