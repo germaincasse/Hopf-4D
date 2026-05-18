@@ -24,6 +24,7 @@ public:
     Entity& duplicateEntity(const Entity& src, std::string name);
     bool    removeEntity(EntityId id);
     void    moveEntityBefore(EntityId src, EntityId target);
+    void    moveEntityToEnd(EntityId src);
 
     // Set or clear (newParent == 0) the parent of an entity. No-op if the change
     // would introduce a cycle.

@@ -355,23 +355,35 @@ void ViewportPanel::render(EditorContext& ctx) {
         }
         if (ImGui::BeginPopup("##cameraPopup")) {
             if (ImGui::CollapsingHeader("Projection", ImGuiTreeNodeFlags_DefaultOpen)) {
-                if (toggleButton("Persp",
-                                 "Perspective in both 3D and 4D (foreshortening).",
-                                 m_camera.projectionStyle == render::ProjectionStyle::Perspective)) {
-                    m_camera.projectionStyle = render::ProjectionStyle::Perspective;
+                static const char* kTipIso =
+                    "Iso\n"
+                    "Projection parallele en 3D ET en 4D.\n"
+                    "Aucune perspective : les objets ne se reduisent pas avec la distance,\n"
+                    "ni en 3D (3D->ecran) ni en 4D (4D->3D). Vue technique / CAO.";
+                static const char* kTipPersp3 =
+                    "Persp3\n"
+                    "Perspective seulement dans la projection 3D vers l'ecran.\n"
+                    "Le collapse 4D->3D reste parallele : pas d'effet de focale en w.\n"
+                    "Compromis : on garde des reperes de profondeur 3D sans deformer\n"
+                    "la 4e dimension.";
+                static const char* kTipPersp4 =
+                    "Persp4\n"
+                    "Perspective complete : a la fois en 4D->3D (focale en w, controlee\n"
+                    "par focal4 + wOffset) ET en 3D->ecran (foreshortening classique).\n"
+                    "Plus immersif, mais plus difficile a lire pour des scenes 4D denses.";
+                if (toggleButton("Iso", kTipIso,
+                                 m_camera.projectionStyle == render::ProjectionStyle::Isometric)) {
+                    m_camera.projectionStyle = render::ProjectionStyle::Isometric;
                 }
                 ImGui::SameLine();
-                if (toggleButton("Hybrid",
-                                 "3D perspective on screen, parallel 4D collapse.\n"
-                                 "Useful when you want depth cues without 4D foreshortening.",
+                if (toggleButton("Persp3", kTipPersp3,
                                  m_camera.projectionStyle == render::ProjectionStyle::Hybrid)) {
                     m_camera.projectionStyle = render::ProjectionStyle::Hybrid;
                 }
                 ImGui::SameLine();
-                if (toggleButton("Iso",
-                                 "Isometric / orthographic in both 3D and 4D.",
-                                 m_camera.projectionStyle == render::ProjectionStyle::Isometric)) {
-                    m_camera.projectionStyle = render::ProjectionStyle::Isometric;
+                if (toggleButton("Persp4", kTipPersp4,
+                                 m_camera.projectionStyle == render::ProjectionStyle::Perspective)) {
+                    m_camera.projectionStyle = render::ProjectionStyle::Perspective;
                 }
                 if (render::perspective4D(m_camera.projectionStyle)) {
                     ImGui::SetNextItemWidth(160.f);
@@ -548,12 +560,19 @@ void ViewportPanel::render(EditorContext& ctx) {
                         }
                     }
                 } else {
+                    // Same camcorder silhouette as the hierarchy icon: rectangle
+                    // body + triangle with its apex touching the body and its
+                    // wide base on the outside.
                     const ImU32 col = sel ? IM_COL32(230, 240, 255, 255)
                                           : IM_COL32(190, 200, 210, 230);
-                    dlOverlay->AddRectFilled(ImVec2(c.x - r * 0.7f, c.y - r * 0.55f),
-                                             ImVec2(c.x + r * 0.35f, c.y + r * 0.55f),
-                                             col, 2.f);
-                    dlOverlay->AddCircleFilled(ImVec2(c.x + r * 0.55f, c.y), r * 0.35f, col, 14);
+                    const ImVec2 bMin{c.x - r * 0.70f, c.y - r * 0.45f};
+                    const ImVec2 bMax{c.x + r * 0.25f, c.y + r * 0.45f};
+                    dlOverlay->AddRectFilled(bMin, bMax, col, 2.f);
+                    dlOverlay->AddTriangleFilled(
+                        ImVec2(bMax.x,           c.y),
+                        ImVec2(c.x + r * 0.75f, c.y - r * 0.55f),
+                        ImVec2(c.x + r * 0.75f, c.y + r * 0.55f),
+                        col);
 
                     // Unity-style frustum gizmo: a small rectangular pyramid with the apex
                     // at the camera entity and the base projected forward along its local
@@ -634,10 +653,31 @@ void ViewportPanel::render(EditorContext& ctx) {
                 if (ctx.toolMode == ToolMode::Translate || ctx.toolMode == ToolMode::Scale) {
                     const bool isScale = (ctx.toolMode == ToolMode::Scale);
                     const float segHitR = 9.f; // perpendicular pixels picking radius for arrow shafts
+
+                    // While dragging in Scale mode, grow/shrink the gizmo length on the
+                    // dragged axis (or on all axes for the uniform handle) to mirror the
+                    // entity's current scale relative to its scale at drag start. The
+                    // multiplier resets to 1 as soon as the user releases.
+                    auto axisScaleMul = [&](int axis) -> float {
+                        if (!isScale || !m_drag.active || m_drag.mode != ToolMode::Scale)
+                            return 1.f;
+                        const auto initial = m_drag.initialScale;
+                        const auto current = selectedEnt->transform.scale;
+                        if (m_drag.handle == 4) {
+                            return std::abs(initial.x) > 1e-6f ? current.x / initial.x : 1.f;
+                        }
+                        if (m_drag.handle == axis) {
+                            const float i = initial[axis], c = current[axis];
+                            return std::abs(i) > 1e-6f ? c / i : 1.f;
+                        }
+                        return 1.f;
+                    };
+
                     for (int axis = 0; axis < 4; ++axis) {
+                        const float axisLen = gizmoLen * axisScaleMul(axis);
                         ImVec2 tip;
                         if (!projectToScreen(m_renderer, m_camera,
-                                             worldDir(axis, gizmoLen), imgMin, tip)) continue;
+                                             worldDir(axis, axisLen), imgMin, tip)) continue;
                         const bool hov = (distToSegment2(mp, originScreen, tip) <= segHitR * segHitR)
                                       || (m_drag.active && m_drag.handle == axis && m_drag.mode == ctx.toolMode);
                         const ImU32 col = hov ? highlight(kAxisColU32[axis]) : kAxisColU32[axis];
@@ -737,11 +777,20 @@ void ViewportPanel::render(EditorContext& ctx) {
         {
             int picked = -1;
             float bestD2 = 1e9f;
+            // First pass: prefer point handles (uniform scale center, rotate discs)
+            // so they win over axis segments that share the same origin.
             for (const auto& h : transformHits) {
-                const float d2 = h.segment
-                                ? distToSegment2(io.MousePos, h.segStart, h.center)
-                                : dist2(io.MousePos, h.center);
+                if (h.segment) continue;
+                const float d2 = dist2(io.MousePos, h.center);
                 if (d2 <= h.radius * h.radius && d2 < bestD2) { bestD2 = d2; picked = h.handle; }
+            }
+            // Second pass: axis segments, only if no point handle was hit.
+            if (picked < 0) {
+                for (const auto& h : transformHits) {
+                    if (!h.segment) continue;
+                    const float d2 = distToSegment2(io.MousePos, h.segStart, h.center);
+                    if (d2 <= h.radius * h.radius && d2 < bestD2) { bestD2 = d2; picked = h.handle; }
+                }
             }
             if (picked >= 0) {
                 ctx.pushUndo();

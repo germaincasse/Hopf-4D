@@ -92,6 +92,17 @@ void Scene::setParent(EntityId child, EntityId newParent) {
     c->parent = newParent;
 }
 
+void Scene::moveEntityToEnd(EntityId src) {
+    auto it = m_entities.end();
+    for (auto i = m_entities.begin(); i != m_entities.end(); ++i) {
+        if (i->id == src) { it = i; break; }
+    }
+    if (it == m_entities.end()) return;
+    Entity moving = std::move(*it);
+    m_entities.erase(it);
+    m_entities.push_back(std::move(moving));
+}
+
 void Scene::clear() {
     m_entities.clear();
     m_meshes.clear();

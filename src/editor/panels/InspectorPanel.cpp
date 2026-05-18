@@ -25,6 +25,9 @@ bool dragVec4Axes(const char* idPrefix, math::Vec4& v, float speed,
 
     bool changed = false;
     for (int i = 0; i < 4; ++i) {
+        // Align the axis letter's baseline to the DragFloat's framepadding so the
+        // first letter doesn't sit higher than the others.
+        ImGui::AlignTextToFramePadding();
         ImGui::PushStyleColor(ImGuiCol_Text, axisColor(letters[i]));
         const char buf[2] = {letters[i], '\0'};
         ImGui::TextUnformatted(buf);
@@ -163,7 +166,23 @@ void InspectorPanel::render(EditorContext& ctx) {
             }
             auto& c4 = *entity->camera4D;
             if (c4.mode == scene::Camera4DComponent::Mode::Projection) {
-                // Three mutually exclusive projection presets as buttons.
+                static const char* kTipIso =
+                    "Iso\n"
+                    "Projection parallele en 3D ET en 4D.\n"
+                    "Aucune perspective : les objets ne se reduisent pas avec la distance,\n"
+                    "ni en 3D (3D->ecran) ni en 4D (4D->3D). Vue technique / CAO.";
+                static const char* kTipPersp3 =
+                    "Persp3\n"
+                    "Perspective seulement dans la projection 3D vers l'ecran.\n"
+                    "Le collapse 4D->3D reste parallele : pas d'effet de focale en w.\n"
+                    "Compromis : on garde des reperes de profondeur 3D sans deformer\n"
+                    "la 4e dimension.";
+                static const char* kTipPersp4 =
+                    "Persp4\n"
+                    "Perspective complete : a la fois en 4D->3D (focale en w, controlee\n"
+                    "par focal4 + wOffset) ET en 3D->ecran (foreshortening classique).\n"
+                    "Plus immersif, mais plus difficile a lire pour des scenes 4D denses.";
+
                 auto projBtn = [&](const char* label, scene::CameraProjection val, const char* tip) {
                     const bool active = (c4.projection == val);
                     if (active) ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
@@ -171,14 +190,11 @@ void InspectorPanel::render(EditorContext& ctx) {
                     if (active) ImGui::PopStyleColor();
                     if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) ImGui::SetTooltip("%s", tip);
                 };
-                projBtn("Iso##c4d",   scene::CameraProjection::Isometric,
-                        "Isometric: parallel in both 3D and 4D");
+                projBtn("Iso##c4d",    scene::CameraProjection::Isometric,     kTipIso);
                 ImGui::SameLine();
-                projBtn("3D persp##c4d", scene::CameraProjection::Perspective3D,
-                        "3D perspective on screen, parallel 4D collapse");
+                projBtn("Persp3##c4d", scene::CameraProjection::Perspective3D, kTipPersp3);
                 ImGui::SameLine();
-                projBtn("4D persp##c4d", scene::CameraProjection::Perspective4D,
-                        "Full perspective in both 3D and 4D");
+                projBtn("Persp4##c4d", scene::CameraProjection::Perspective4D, kTipPersp4);
                 if (c4.projection == scene::CameraProjection::Perspective4D) {
                     ImGui::DragFloat("Focal4##c4d",  &c4.focal4,  0.05f, 0.5f, 20.f);
                     ImGui::DragFloat("wOffset##c4d", &c4.wOffset, 0.05f, -10.f, 10.f);
