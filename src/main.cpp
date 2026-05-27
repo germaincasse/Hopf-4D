@@ -3,10 +3,13 @@
 
 #include <cstdio>
 #include <exception>
+#include <filesystem>
 
-int main(int /*argc*/, char** /*argv*/) {
+int main(int argc, char** argv) {
     try {
-        hopf::core::Application app;
+        std::filesystem::path exePath;
+        if (argc > 0 && argv[0]) exePath = argv[0];
+        hopf::core::Application app(std::move(exePath));
         return app.run();
     } catch (const std::exception& e) {
         std::fprintf(stderr, "Fatal: %s\n", e.what());

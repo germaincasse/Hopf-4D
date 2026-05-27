@@ -46,6 +46,11 @@ public:
     // pixel delta since the previous frame.
     virtual void onMouseDragged(float /*dx*/, float /*dy*/, int /*button*/) {}
 
+    // Fired in Play mode on mouse press / release inside the Game view. Use this
+    // for click-and-hold mechanics (charging a shot, holding to aim, etc).
+    // `button` is 0 for left, 1 for right, 2 for middle.
+    virtual void onMouseButton(int /*button*/, bool /*pressed*/) {}
+
     // Owning entity / scene. Re-resolved each call so the pointer stays valid even
     // when other scripts spawn or remove entities (which would invalidate a stored
     // Entity*). Returns nullptr if the owning entity has been destroyed.

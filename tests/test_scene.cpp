@@ -7,9 +7,9 @@ using namespace hopf;
 
 TEST_CASE("Scene assigns unique entity ids", "[scene]") {
     scene::Scene s;
-    auto& a = s.addEntity("A");
-    auto& b = s.addEntity("B");
-    REQUIRE(a.id != b.id);
+    const auto aId = s.addEntity("A").id; // capture by value: addEntity may realloc
+    const auto bId = s.addEntity("B").id;
+    REQUIRE(aId != bId);
 }
 
 TEST_CASE("Scene::addPrimitive binds mesh and entity", "[scene]") {

@@ -12,7 +12,7 @@ namespace hopf::core {
 
 class Application {
 public:
-    Application();
+    explicit Application(std::filesystem::path exePath = {});
     ~Application();
 
     int run();
@@ -20,6 +20,7 @@ public:
 private:
     void buildDefaultScene();
 
+    std::filesystem::path             m_exePath;
     std::unique_ptr<platform::Window> m_window;
     std::unique_ptr<editor::Editor>   m_editor;
     std::unique_ptr<scene::Scene>     m_scene;

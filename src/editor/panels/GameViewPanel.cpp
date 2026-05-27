@@ -41,6 +41,14 @@ void dispatchMouseDragged(scene::Scene& scene, float dx, float dy, int button) {
     }
 }
 
+void dispatchMouseButton(scene::Scene& scene, int button, bool pressed) {
+    for (auto& e : scene.entities()) {
+        for (auto& s : e.scripts) {
+            if (s.instance) s.instance->onMouseButton(button, pressed);
+        }
+    }
+}
+
 } // namespace
 
 void GameViewPanel::render(EditorContext& ctx) {
@@ -129,11 +137,15 @@ void GameViewPanel::render(EditorContext& ctx) {
         if (hovered && playing) {
             if (io.MouseWheel != 0.f) dispatchMouseWheel(*ctx.scene, io.MouseWheel);
             for (int b = 0; b < 3; ++b) {
+                if (ImGui::IsMouseClicked(b))  dispatchMouseButton(*ctx.scene, b, true);
                 if (ImGui::IsMouseDragging(b)) {
                     if (io.MouseDelta.x != 0.f || io.MouseDelta.y != 0.f) {
                         dispatchMouseDragged(*ctx.scene, io.MouseDelta.x, io.MouseDelta.y, b);
                     }
                 }
+            }
+            for (int b = 0; b < 3; ++b) {
+                if (ImGui::IsMouseReleased(b)) dispatchMouseButton(*ctx.scene, b, false);
             }
 
             auto handleClick = [&](int btn, bool& pending) {

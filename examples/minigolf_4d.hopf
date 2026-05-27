@@ -1,0 +1,180 @@
+hopf-scene 1
+sceneName Minigolf 4D
+entity
+  id 1
+  parent 0
+  name Minigolf
+  pos 0 0 0 0
+  rot 0 0 0 0 0 0
+  scale 1 1 1 1
+  visible 1
+  autoRotate 0 0 0 0 0 0
+  script Minigolf4D
+end
+entity
+  id 2
+  parent 1
+  name Ground
+  pos 0 -2 0 0
+  rot 0 0 0 0 0 0
+  scale 12 0.3 12 4
+  visible 1
+  autoRotate 0 0 0 0 0 0
+  primitive Tesseract
+  collider 4 0
+  rigidbody 4 1 1 0
+  tint 0.3 0.55 0.3
+end
+entity
+  id 3
+  parent 1
+  name Ball
+  pos -4 -1.3 -4 0
+  rot 0 0 0 0 0 0
+  scale 0.5 0.5 0.5 0.5
+  visible 1
+  autoRotate 0 0 0 0 0 0
+  primitive Icositetrachoron
+  collider 4 0
+  rigidbody 4 0.4 0 1
+  tint 1 1 1
+end
+entity
+  id 4
+  parent 1
+  name Hole
+  pos 4 -1.7 4 0
+  rot 0 0 0 0 0 0
+  scale 0.9 0.05 0.9 0.9
+  visible 1
+  autoRotate 0 0 0 0 0 0
+  primitive Tesseract
+  tint 0.1 0.1 0.1
+end
+entity
+  id 5
+  parent 1
+  name WallN
+  pos 0 -1.45 6.25 0
+  rot 0 0 0 0 0 0
+  scale 12.5 0.8 0.5 8
+  visible 1
+  autoRotate 0 0 0 0 0 0
+  primitive Tesseract
+  collider 4 0
+  rigidbody 4 1 1 0
+  tint 0.55 0.4 0.2
+end
+entity
+  id 6
+  parent 1
+  name WallS
+  pos 0 -1.45 -6.25 0
+  rot 0 0 0 0 0 0
+  scale 12.5 0.8 0.5 8
+  visible 1
+  autoRotate 0 0 0 0 0 0
+  primitive Tesseract
+  collider 4 0
+  rigidbody 4 1 1 0
+  tint 0.55 0.4 0.2
+end
+entity
+  id 7
+  parent 1
+  name WallE
+  pos 6.25 -1.45 0 0
+  rot 0 0 0 0 0 0
+  scale 0.5 0.8 12 8
+  visible 1
+  autoRotate 0 0 0 0 0 0
+  primitive Tesseract
+  collider 4 0
+  rigidbody 4 1 1 0
+  tint 0.55 0.4 0.2
+end
+entity
+  id 8
+  parent 1
+  name WallW
+  pos -6.25 -1.45 0 0
+  rot 0 0 0 0 0 0
+  scale 0.5 0.8 12 8
+  visible 1
+  autoRotate 0 0 0 0 0 0
+  primitive Tesseract
+  collider 4 0
+  rigidbody 4 1 1 0
+  tint 0.55 0.4 0.2
+end
+entity
+  id 9
+  parent 1
+  name Sun
+  pos 4 6 2 0
+  rot 0.4 0 0 0.5 0 0
+  scale 1 1 1 1
+  visible 1
+  autoRotate 0 0 0 0 0 0
+  light 1 1 0.95 0.85
+end
+entity
+  id 10
+  parent 0
+  name Main Camera
+  pos 0 2 6 0
+  rot 0 0 0 0 0 0
+  scale 1 1 1 1
+  visible 1
+  autoRotate 0 0 0 0 0 0
+  camera4D 0 1 4 3 0 0 0 1 0 1 3 0.12 0.18 0.22
+  audioListener 1
+end
+entity
+  id 11
+  parent 1
+  name Title
+  pos 0 0 0 0
+  rot 0 0 0 0 0 0
+  scale 1 1 1 1
+  visible 1
+  autoRotate 0 0 0 0 0 0
+  uiRect 1 0 18 260 32 0.05 0.05 0.08 0.7 0
+  uiText 20 1 1 1 1 Minigolf 4D
+end
+entity
+  id 12
+  parent 1
+  name RestartBtn
+  pos 0 0 0 0
+  rot 0 0 0 0 0 0
+  scale 1 1 1 1
+  visible 1
+  autoRotate 0 0 0 0 0 0
+  uiRect 2 -20 20 120 36 0.2 0.4 0.7 1 0
+  uiText 16 1 1 1 1 New Game
+  uiButton 0.2 0.4 0.7 1 0.35 0.55 0.85 1 Minigolf4D restart
+end
+entity
+  id 13
+  parent 1
+  name MinigolfStatus
+  pos 0 0 0 0
+  rot 0 0 0 0 0 0
+  scale 1 1 1 1
+  visible 1
+  autoRotate 0 0 0 0 0 0
+  uiRect 0 20 60 460 32 0 0 0 0.55 0
+  uiText 18 1 1 1 1 Level 1/3
+end
+entity
+  id 14
+  parent 1
+  name MinigolfPower
+  pos 0 0 0 0
+  rot 0 0 0 0 0 0
+  scale 1 1 1 1
+  visible 0
+  autoRotate 0 0 0 0 0 0
+  uiRect 7 0 -40 300 18 0.8 0.7 0.2 0.9 0
+end

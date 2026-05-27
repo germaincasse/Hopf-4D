@@ -1,0 +1,1 @@
+--out-path /mnt/c/Users/germa/Documents/4d engine/build-linux/gladsources/glad --api gl:core=4.6 c --loader

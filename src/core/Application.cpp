@@ -16,7 +16,9 @@
 
 namespace hopf::core {
 
-Application::Application() {
+Application::Application(std::filesystem::path exePath)
+    : m_exePath(std::move(exePath))
+{
     platform::WindowDesc desc;
     desc.title  = "Hopf";
     desc.width  = 1600;
@@ -48,17 +50,42 @@ Application::Application() {
         scene::saveScene(*m_scene, defaultScenePath);
     }
 
-    // Mirror the engine's bundled examples folder (next to the cwd) into the
-    // project, so the Files panel surfaces ready-to-play example scenes.
-    const auto srcExamples = std::filesystem::current_path(ec) / "examples";
+    // Find the engine's bundled examples folder. We search a list of candidate
+    // locations so the editor works whether you launch it from the source root,
+    // from the build directory, or by double-clicking the .exe in Explorer.
+    auto findExamplesSource = [&]() -> std::filesystem::path {
+        const auto cwd = std::filesystem::current_path(ec);
+        const auto exeDir = m_exePath.empty() ? cwd : m_exePath.parent_path();
+        const std::filesystem::path candidates[] = {
+            cwd / "examples",
+            exeDir / "examples",
+            exeDir / ".." / "examples",
+            exeDir / ".." / ".." / "examples",
+            exeDir / ".." / ".." / ".." / "examples",
+#ifdef HOPF_SOURCE_DIR
+            std::filesystem::path(HOPF_SOURCE_DIR) / "examples",
+#endif
+        };
+        for (const auto& c : candidates) {
+            std::error_code probe;
+            if (std::filesystem::is_directory(c, probe)) {
+                return std::filesystem::weakly_canonical(c, probe);
+            }
+        }
+        return {};
+    };
+    const auto srcExamples = findExamplesSource();
     const auto dstExamples = projectDir / "examples";
-    if (std::filesystem::exists(srcExamples, ec)) {
+    if (!srcExamples.empty()) {
         std::filesystem::create_directories(dstExamples, ec);
         for (const auto& entry : std::filesystem::directory_iterator(srcExamples, ec)) {
             std::filesystem::copy_file(entry.path(),
                                        dstExamples / entry.path().filename(),
                                        std::filesystem::copy_options::overwrite_existing, ec);
         }
+        Logger::info("Examples copied from %s", srcExamples.string().c_str());
+    } else {
+        Logger::warning("Engine examples folder not found in any candidate location.");
     }
 
     m_projectDir = projectDir;

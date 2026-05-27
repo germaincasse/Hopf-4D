@@ -46,6 +46,7 @@ set(HOPF_SOURCES
 
     src/examples/CameraOrbit4D.cpp
     src/examples/Minesweeper4D.cpp
+    src/examples/Minigolf4D.cpp
 
     src/render/Shader.cpp
     src/render/Slicer.cpp
@@ -72,6 +73,10 @@ target_include_directories(Hopf PRIVATE
     "${CMAKE_SOURCE_DIR}/include"
     "${CMAKE_SOURCE_DIR}/src"
 )
+
+# Embed the source dir so the editor can locate bundled examples even when the
+# exe is launched from somewhere with no nearby "examples/" folder.
+target_compile_definitions(Hopf PRIVATE "HOPF_SOURCE_DIR=\"${CMAKE_SOURCE_DIR}\"")
 
 target_link_libraries(Hopf PRIVATE
     glfw
